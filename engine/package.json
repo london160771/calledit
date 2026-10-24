@@ -1,0 +1,1 @@
+{"name":"@calledit/engine","version":"1.0.0","type":"module","exports":"./src/index.js","scripts":{"test":"node --test"}}

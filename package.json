@@ -1,0 +1,1 @@
+{"name":"calledit","private":true,"type":"module","workspaces":["engine","server","web"],"engines":{"node":">=22"},"scripts":{"test":"npm test --workspaces --if-present"}}
