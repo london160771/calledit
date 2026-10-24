@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { seed7 } from '@calledit/engine';
 import { replayView, simulationView, simulationCommand, attackCodes, runAttack, reason } from './model.js';
 import './style.css';
+import { LiveSync } from './LiveSync.jsx';
 const key='calledit-simulation';
 function load(){try{return JSON.parse(localStorage.getItem(key)??'[]');}catch{return [];}}
 function Verdicts({verdicts}) {return <div className="feed" aria-live="polite">{!verdicts.length?<p className="empty">No calls yet. Open a round and send a call.</p>:verdicts.map((v,i)=><article className={`verdict ${v.code==='ACCEPTED'?'accepted':v.code==='LATE_SAW_IT'?'late':''}`} key={i}><div><strong>{v.code==='ACCEPTED'?'✅':'❌'} {v.userLogin}</strong><span className="code">{v.code}</span></div><p>{reason(v)}</p>{v.result&&<span className="result">{v.result}</span>}</article>)}</div>}
@@ -27,5 +28,6 @@ function App(){
  {!isDashboard&&<section className="panel comparison"><p className="eyebrow">SAME FOUR CALLS. DIFFERENT RULES.</p><h2>What a single lock time gets wrong</h2><p>An honest call arrives before that viewer sees the result. Compare admission decisions for eve, ben, ada and cy.</p><table><thead><tr><th>Rule</th><th>Wrong verdicts</th></tr></thead><tbody>{Object.entries(state.comparison??{'Lock-at-click':null,'Lock-at-event':null,CalledIt:null}).map(([label,value])=><tr key={label}><td>{label}</td><td>{value??'—'}</td></tr>)}</tbody></table><details><summary>All verdict totals</summary><ul>{Object.entries(state.totals).map(([code,value])=><li key={code}>{code}: {value}</li>)}</ul></details></section>}
  <AttackLab/><footer>CalledIt · Personal delays. Clear verdicts. <span>All activity on this page is simulated.</span></footer></main></>;
 }
-createRoot(document.getElementById('root')).render(<App/>);
+createRoot(document.getElementById('root')).render(location.pathname==='/dashboard' && new URLSearchParams(location.search).has('liveSync') ? <LiveSync/> : <App/>);
+
 

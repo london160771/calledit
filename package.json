@@ -1,1 +1,17 @@
-{"name":"calledit","private":true,"type":"module","workspaces":["engine","server","web"],"engines":{"node":">=22"},"scripts":{"test":"npm test --workspaces --if-present"}}
+{
+  "name": "calledit",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "engine",
+    "server",
+    "web"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "npm test --workspaces --if-present",
+    "start": "node --env-file-if-exists=.env server/src/index.js"
+  }
+}
