@@ -1,1 +1,20 @@
-{"name":"@calledit/web","version":"1.0.0","private":true,"type":"module"}
+{
+  "name": "@calledit/web",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "test": "node --test && vite build"
+  },
+  "dependencies": {
+    "@calledit/engine": "^1.0.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.1.2",
+    "vite": "^8.3.5"
+  }
+}

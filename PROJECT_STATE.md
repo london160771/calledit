@@ -24,3 +24,13 @@
 
 ## Log
 - 2026-10-24: Phase 1 complete; 19 tests passed, 0 failed. Phase 2 next.
+
+## Phase 2 complete
+- React + Vite, plain CSS: /judge, /dashboard, /overlay.
+- Seed-7 browser replay and final totals; 2/2/0 comparison; Attack Lab covers every reason code.
+- Dashboard simulated Sync/Open/Call/LANDED/MISSED/Void controls; local storage shares its feed with the overlay.
+- `npm test`: 23 passed, 0 failed; Vite production build passed.
+- Browser checks: Run the demo reached 25/25 with exact totals; all attacks displayed; dashboard Sync/Open/Call/LANDED yielded 2 correct and 2 wrong; overlay displayed those calls and MANGO.
+- Desktop and 390px mobile layouts inspected. Overlay HTML/body computed backgrounds both transparent.
+- Decision: simulated dashboard uses a deterministic clock and fake sync replies; production live wiring stays in Phase 4.
+- Current phase: Phase 3 next. Owner's Phase 0 remains pending.
