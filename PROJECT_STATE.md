@@ -4,7 +4,7 @@
 - **Phase 0** (owner): pending Gate 0 delay test. Codex skipped it as instructed.
 - **Phase 1** (Codex): complete, pushed as `47e017a`.
 - **Phase 2** (Codex): complete, pushed as `c851944`.
-- **Phase 3** (Codex, then owner): live overlay verified by owner; chat diagnostics and reconnect fixes complete, awaiting another live calibration test.
+- **Phase 3** (Codex, then owner): owner verified enabled subscription and chat delivery; live timing widened to 45 seconds with countdowns, awaiting the next live sample test.
 - **Phases 4 and 5**: not started. Resume Phase 4 after the owner verifies Phase 3.
 
 ## Done
@@ -38,7 +38,7 @@
 ## Pending (owner)
 1. Restart the updated Node server with `npm start`, refresh the dashboard and OBS source, and reconnect Twitch as ayyoweb3 if needed.
 2. Keep OBS at `http://localhost:3000/overlay?live=1` (1920x1080). Open `http://localhost:3000/dashboard?liveSync=1`.
-3. Watch the Node terminal for an enabled chat subscription on ayyoweb3, start a fresh sync and have london1607 / becca160771 reply within 15 seconds. Follow server/LOCAL_TWITCH.md to inspect recorded/rejected sample logs and report the results.
+3. Watch the Node terminal for an enabled chat subscription on ayyoweb3, start a fresh sync and have london1607 / becca160771 reply before the live countdown ends (45 seconds by default). Follow server/LOCAL_TWITCH.md to inspect recorded/rejected sample logs and report the results.
 4. Finish Gate 0: record at least a 2-second extra iPhone delay versus the fast tab in evidence/gate0.md.
 5. Resume Phase 4 only after the live calibration is verified. No deployment is authorized.
 ## Log
@@ -66,3 +66,13 @@
 - Tests: final `npm test` passed **50 passed, 0 failed** (engine 19, server 16, web 15) plus Vite production build. Full real-shaped channel.chat.message envelopes for both named viewers pass through Node, /api/state and the actual dashboard table component without browser polling, with case/spaces and two sync IDs. Rejection logs, expired replies, duplicate deliveries, invalid subscription, redaction, keepalive boundary, candidate failure, capped backoff, visibility/online recovery and stale response protection are covered.
 - Files: server/src/auth.js, server/src/eventsub.js, server/src/runtime.js, server/src/log.js, server/test/twitch.test.js, web/src/live-state.js, web/src/LiveSync.jsx, web/src/LiveOverlay.js, web/src/ViewerDelays.js, web/test/live-chat.test.js, web/test/live-overlay.test.js, server/LOCAL_TWITCH.md, PROJECT_STATE.md.
 - Decision: retain the PRD timing contract; make expiry explicit rather than extend calibration times. No Phase 4 work or deployment. Stop after commit/push for the requested owner live test.
+
+## Phase 3 live timing overrides — 2026-10-25
+- Owner confirmed the pipeline works: enabled subscription and chat.received, followed by sync.rejected because receivedAt ...836661 minus shownAt ...819156 = 17505 ms exceeded the old 15000 ms window.
+- Scope: live Node runtime only. Added LIVE_SYNC_WINDOW_MS and LIVE_MAX_DELAY_MS, each defaulting to 45000 ms and validated as positive whole milliseconds. The root server startup reads both from .env and passes them into the live engine; no engine/ files, engine defaults, Seed-7 values, /judge or simulation behavior changed.
+- Live sync expiry, diagnostic rejection rules and engine config now use the same settings. sync.started logs both values; all live sync.rejected events include both, with explicit limits in timing rejection text.
+- Dashboard and live overlay share a sync-word component with visible seconds left from server syncRemainingMs. They retain the word for the configured live window and keep the original server shownAt. A fresh Sync resets the countdown; reloading the browser does not.
+- Updated .env.example (one-line explanations), the exact requested PRD §4 line, and server/LOCAL_TWITCH.md configuration and live-test instructions.
+- Final `npm test`: **56 passed, 0 failed** (engine 19, server 19, web 18), plus Vite production build. Tests cover a 17500 ms reply recorded by the live engine and ignored by the unchanged default engine, a 35000 ms live sample above the old cap, inclusive 45000 ms boundary, rejection after expiry, independent environment overrides, invalid values, log limits, countdowns and the existing Seed-7 / 10k-round suite.
+- Files: server/src/live-config.js, server/src/index.js, server/src/runtime.js, server/test/live-config.test.js, server/test/twitch.test.js, web/src/LiveSyncWord.js, web/src/LiveSync.jsx, web/src/LiveOverlay.js, web/src/style.css, web/test/live-chat.test.js, web/test/live-overlay.test.js, .env.example, PRD.md, server/LOCAL_TWITCH.md, PROJECT_STATE.md.
+- Decision: countdowns round remaining server milliseconds up to whole seconds. The engine keeps its inclusive sync-window boundary. No live account was reconnected or deployment performed. Stop after commit/push as requested; owner restarts the server and refreshes dashboard/OBS for another live test.

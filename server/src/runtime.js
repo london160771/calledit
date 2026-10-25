@@ -1,13 +1,15 @@
-import {createEngine, defaults} from '@calledit/engine';
+import {createEngine} from '@calledit/engine';
 import {createEventSub} from './eventsub.js';
 import {createSummarySender} from './summary.js';
 import {logEvent} from './log.js';
+import {readLiveConfig} from './live-config.js';
 
 /** Twitch adapter; live round controls are wired in Phase 4. */
-export function createRuntime({auth, clock = Date.now, eventSubOptions = {}, engine = createEngine(), log = logEvent}) {
+export function createRuntime({auth, clock = Date.now, eventSubOptions = {}, config = readLiveConfig(), engine = createEngine(config), log = logEvent}) {
   const users = new Set();
   let status = 'disconnected', sync = null, subscription = null;
-  const client = createEventSub({engine, clock, log, ...eventSubOptions,
+  const liveLog = (event, details) => log(event, event === 'sync.rejected' ? {...details, syncWindowMs: config.syncWindowMs, maxDelayMs: config.maxDelayMs} : details);
+  const client = createEventSub({engine, clock, log: liveLog, ...eventSubOptions,
     subscribe: async sessionId => {
       const {userId, login} = auth.getIdentity();
       const request = {type: 'channel.chat.message', version: '1', condition: {broadcaster_user_id: userId, user_id: userId}, transport: {method: 'websocket', session_id: sessionId}};
@@ -38,11 +40,11 @@ export function createRuntime({auth, clock = Date.now, eventSubOptions = {}, eng
       if (!sync) reason = 'NO_ACTIVE_SYNC';
       else if (input.text.trim().toLowerCase() !== sync.word.trim().toLowerCase()) reason = 'WORD_MISMATCH';
       else if (details.delayMs < 0) reason = 'BEFORE_SYNC';
-      else if (details.delayMs > defaults.syncWindowMs) reason = 'SYNC_WINDOW_EXPIRED';
-      else if (details.delayMs > defaults.maxDelayMs) reason = 'MAX_DELAY_EXCEEDED';
+      else if (details.delayMs > config.syncWindowMs) reason = 'SYNC_WINDOW_EXPIRED';
+      else if (details.delayMs > config.maxDelayMs) reason = 'MAX_DELAY_EXCEEDED';
       else if (sample) reason = 'ALREADY_SAMPLED_THIS_SYNC';
       else reason = 'ENGINE_IGNORED';
-      log('sync.rejected', {...details, reason, syncWindowMs: defaults.syncWindowMs});
+      liveLog('sync.rejected', {...details, reason, reasonText: reason === 'SYNC_WINDOW_EXPIRED' ? `Reply delay ${details.delayMs} ms exceeds live sync window ${config.syncWindowMs} ms.` : reason === 'MAX_DELAY_EXCEEDED' ? `Reply delay ${details.delayMs} ms exceeds live delay cap ${config.maxDelayMs} ms.` : reason});
     }
   });
   const sendSummary = createSummarySender({clock, send: async message => {
@@ -57,9 +59,12 @@ export function createRuntime({auth, clock = Date.now, eventSubOptions = {}, eng
     startSync() {
       if (status !== 'connected') throw new Error('Connect to Twitch before syncing.');
       const shownAt = clock();
-      sync = {syncId: `sync-${shownAt}`, word: ['MANGO', 'PAPAYA', 'PEACH'][Math.floor(shownAt / 1000) % 3], shownAt, expiresAt: shownAt + defaults.syncWindowMs};
+      sync = {syncId: `sync-${shownAt}`, word: ['MANGO', 'PAPAYA', 'PEACH'][Math.floor(shownAt / 1000) % 3], shownAt, syncWindowMs: config.syncWindowMs, maxDelayMs: config.maxDelayMs, expiresAt: shownAt + config.syncWindowMs};
       engine.startSync(sync); log('sync.started', sync); return {...sync};
     },
-    snapshot() {return {status, account: auth.getIdentity()?.login ?? null, subscription, sync, syncActive: !!sync && clock() <= sync.expiresAt, viewers: [...users].map(id => engine.getViewer(id)).filter(Boolean)};}
+    snapshot() {
+      const now = clock();
+      return {status, account: auth.getIdentity()?.login ?? null, subscription, sync, syncActive: !!sync && now <= sync.expiresAt, syncRemainingMs: sync ? Math.max(0, sync.expiresAt - now) : 0, viewers: [...users].map(id => engine.getViewer(id)).filter(Boolean)};
+    }
   };
 }

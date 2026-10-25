@@ -28,6 +28,8 @@ Every Twitch viewer sees the stream late, and each one by a different amount. An
 ## 4. Engine rules (pure, deterministic)
 The engine never reads the clock or random numbers itself. All times come in as input, in **milliseconds** on one server clock.
 
+Live server overrides syncWindowMs and maxDelayMs via .env (default 45000); engine defaults stay as the Seed-7 contract.
+
 ### Config defaults
 | Key | Default | Meaning |
 |---|---|---|

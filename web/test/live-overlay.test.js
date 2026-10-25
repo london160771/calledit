@@ -4,6 +4,7 @@ import {createElement} from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
 import {isLiveOverlay, watchLiveState, liveConnectionLabel} from '../src/live-state.js';
 import {LiveSyncOverlay} from '../src/LiveOverlay.js';
+import {LiveSyncWord} from '../src/LiveSyncWord.js';
 const flush = () => new Promise(resolve => setImmediate(resolve));
 const render = (state, error) => renderToStaticMarkup(createElement(LiveSyncOverlay, {state, error}));
 
@@ -103,4 +104,15 @@ test('a stalled browser request times out and retries with backoff', async () =>
   const stop=watchLiveState({documentRef:null,windowRef:null,fetchImpl:async(url,{signal})=>new Promise((resolve,reject)=>signal.addEventListener('abort',()=>reject(new Error('aborted')))),
     onState:()=>assert.fail('no response'),onError:e=>{error=e;},setTimer:(fn,ms)=>{if(ms===5000)timeout=fn;else next=fn;},clearTimer:()=>{}});
   timeout();await flush();assert.equal(error,'Reconnecting to CalledIt server…');assert.equal(typeof next,'function');stop();
+});
+
+test('both live surfaces share a visible countdown for the full configured window', () => {
+  const sync={syncId:'live',word:'MANGO',shownAt:123000,expiresAt:168000,syncWindowMs:45000,maxDelayMs:45000};
+  for(const [remainingMs,seconds] of [[45000,45],[27500,28],[1000,1],[0,0]]) {
+    const state={status:'connected',syncActive:true,sync,syncRemainingMs:remainingMs};
+    const overlay=render(state);
+    const dashboardWord=renderToStaticMarkup(createElement(LiveSyncWord,{sync,remainingMs}));
+    for(const html of [overlay,dashboardWord]){assert.match(html,/SAY: MANGO/);assert.match(html,new RegExp(`${seconds} seconds left`));assert.match(html,/role="timer"/);}
+  }
+  assert.doesNotMatch(render({status:'connected',syncActive:false,sync,syncRemainingMs:0}),/SAY:/);
 });

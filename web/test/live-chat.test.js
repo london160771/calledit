@@ -7,12 +7,14 @@ import {renderToStaticMarkup} from 'react-dom/server';
 import {createRuntime} from '../../server/src/runtime.js';
 import {createApp} from '../../server/src/app.js';
 import {ViewerDelays} from '../src/ViewerDelays.js';
+import {createEngine} from '@calledit/engine';
+import {readLiveConfig} from '../../server/src/live-config.js';
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
 class Socket extends EventEmitter {close(){this.emit('close',1000,Buffer.from('test close'));}}
-async function fixture(subscriptionStatus='enabled') {
+async function fixture(subscriptionStatus='enabled', config) {
   let now=123000;const sockets=[],logs=[];
   const auth={validate:async()=>{},getIdentity:()=>({userId:'owner-id',login:'ayyoweb3'}),helix:async(path,body)=>({data:[{id:'0b7f3361-672b-4d39-b307-dd5b576c9b27',status:subscriptionStatus,type:'channel.chat.message',version:'1',condition:body.condition,transport:body.transport,cost:0,created_at:'2026-10-25T21:00:00Z'}]})};
-  const runtime=createRuntime({auth,clock:()=>now,log:(event,details)=>logs.push({event,...details}),eventSubOptions:{makeSocket:()=>{const socket=new Socket();sockets.push(socket);return socket;},setTimer:()=>0,clearTimer:()=>{}}});
+  const runtime=createRuntime({auth,config,clock:()=>now,log:(event,details)=>logs.push({event,...details}),eventSubOptions:{makeSocket:()=>{const socket=new Socket();sockets.push(socket);return socket;},setTimer:()=>0,clearTimer:()=>{}}});
   await runtime.start();
   sockets[0].emit('message',JSON.stringify({metadata:{message_id:'welcome-id',message_type:'session_welcome',message_timestamp:'2026-10-25T21:00:00Z'},payload:{session:{id:'session-id',status:'connected',connected_at:'2026-10-25T21:00:00Z',keepalive_timeout_seconds:10,reconnect_url:null}}}));
   await flush();
@@ -55,10 +57,10 @@ test('sync diagnostic reasons explain no active word, mismatch, duplicate, wrong
   f.time(125000);f.chat('london1607','MANGO','first');
   f.chat('london1607','MANGO','first');
   f.chat('london1607','MANGO','duplicate');
-  f.time(139001);f.chat('becca160771','MANGO','expired');
+  f.time(169001);f.chat('becca160771','MANGO','expired');
   assert.equal(f.runtime.snapshot().syncActive,false);
-  f.time(141000);const next=f.runtime.startSync();assert.equal(next.word,'MANGO');
-  f.time(142000);f.chat('london1607','MANGO','new-sync');
+  f.time(171000);const next=f.runtime.startSync();assert.equal(next.word,'MANGO');
+  f.time(172000);f.chat('london1607','MANGO','new-sync');
   assert.equal(f.runtime.snapshot().viewers[0].samples.length,2);
   assert.deepEqual(f.logs.filter(row=>row.event==='sync.rejected').map(row=>row.reason),['NO_ACTIVE_SYNC','WORD_MISMATCH','REPLAYED_MESSAGE','ALREADY_SAMPLED_THIS_SYNC','SYNC_WINDOW_EXPIRED']);
   assert.equal(f.runtime.snapshot().viewers.some(v=>v.userLogin==='becca160771'),false);
@@ -69,4 +71,36 @@ test('a non-enabled chat subscription fails closed and is logged, not reported a
   const f=await fixture('authorization_revoked');t.after(()=>f.runtime.stop());
   assert.equal(f.runtime.snapshot().status,'disconnected');assert.throws(()=>f.runtime.startSync(),/Connect/);
   assert.ok(f.logs.some(row=>row.event==='subscription.failed'));
+});
+
+test('a real-shaped reply at 17.5 seconds is recorded live but rejected by engine defaults', async t => {
+  const f=await fixture();t.after(()=>f.runtime.stop());
+  const sync=f.runtime.startSync();
+  assert.equal(sync.syncWindowMs,45000);assert.equal(sync.maxDelayMs,45000);assert.equal(sync.expiresAt,sync.shownAt+45000);
+  f.time(sync.shownAt+17500);f.chat('london1607',sync.word,'late-for-old-window');
+  assert.equal(f.runtime.snapshot().viewers[0].dViewer,17500);
+  assert.equal(f.runtime.snapshot().syncActive,true);assert.equal(f.runtime.snapshot().syncRemainingMs,27500);
+  const engine=createEngine();engine.startSync(sync);
+  engine.handleMessage({messageId:'same-delay',userId:'viewer',userLogin:'london1607',text:sync.word,receivedAt:sync.shownAt+17500});
+  assert.equal(engine.getViewer('viewer'),undefined);
+  f.time(sync.shownAt+35000);f.chat('becca160771',sync.word,'above-old-cap');
+  assert.equal(f.runtime.snapshot().viewers[1].dViewer,35000);
+  f.time(sync.shownAt+45000);f.chat('boundary',sync.word,'boundary');
+  assert.equal(f.runtime.snapshot().viewers[2].dViewer,45000);
+  f.time(sync.shownAt+45001);f.chat('expired',sync.word,'outside-live-window');
+  assert.equal(f.runtime.snapshot().viewers.length,3);assert.equal(f.runtime.snapshot().syncActive,false);assert.equal(f.runtime.snapshot().syncRemainingMs,0);
+  const started=f.logs.find(row=>row.event==='sync.started');assert.equal(started.syncWindowMs,45000);assert.equal(started.maxDelayMs,45000);
+  const rejected=f.logs.find(row=>row.event==='sync.rejected');assert.equal(rejected.reason,'SYNC_WINDOW_EXPIRED');assert.equal(rejected.syncWindowMs,45000);assert.equal(rejected.maxDelayMs,45000);assert.match(rejected.reasonText,/45000/);
+});
+
+test('live environment overrides reach the engine, expiry, countdown and rejection diagnostics', async t => {
+  const config=readLiveConfig({LIVE_SYNC_WINDOW_MS:'60000',LIVE_MAX_DELAY_MS:'30000'});
+  const f=await fixture('enabled',config);t.after(()=>f.runtime.stop());
+  const sync=f.runtime.startSync();assert.equal(sync.expiresAt,sync.shownAt+60000);
+  f.time(sync.shownAt+25000);f.chat('london1607',sync.word,'allowed');assert.equal(f.runtime.snapshot().viewers[0].dViewer,25000);
+  f.time(sync.shownAt+35000);f.chat('becca160771',sync.word,'over-custom-cap');
+  assert.equal(f.runtime.snapshot().viewers.length,1);assert.equal(f.runtime.snapshot().syncActive,true);assert.equal(f.runtime.snapshot().syncRemainingMs,25000);
+  const rejection=f.logs.find(row=>row.event==='sync.rejected');assert.equal(rejection.reason,'MAX_DELAY_EXCEEDED');assert.equal(rejection.syncWindowMs,60000);assert.equal(rejection.maxDelayMs,30000);assert.match(rejection.reasonText,/30000/);
+  f.chat('becca160771',sync.word,'over-custom-cap');
+  const replay=f.logs.filter(row=>row.event==='sync.rejected').at(-1);assert.equal(replay.reason,'REPLAYED_MESSAGE');assert.equal(replay.syncWindowMs,60000);
 });

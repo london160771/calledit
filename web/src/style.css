@@ -8,3 +8,4 @@
 .live-overlay .sync-flash h1 { max-width: none; font-size: clamp(56px, 12vw, 180px); overflow-wrap: anywhere; margin: 16px 0 0; }
 .live-overlay .sync-flash small { font-size: clamp(12px, 2vw, 24px); }
 .live-overlay-status { background: #111e17ed; padding: 16px; font-size: 24px; }
+.sync-flash .sync-countdown { color: #14200c; font-weight: 700; font-size: clamp(20px, 3vw, 38px); margin: 16px 0 0; font-variant-numeric: tabular-nums; }
