@@ -12,7 +12,7 @@ const flush=()=>new Promise(resolve=>setImmediate(resolve));
 class Socket extends EventEmitter{constructor(url){super();this.url=url;}close(){this.closed=true;this.emit('close');}message(type,payload={},extra={}){this.emit('message',JSON.stringify({metadata:{message_type:type,...extra},payload}));}}
 function fixture(subscribe=async()=>{}){
  let now=0;const sockets=[],timers=new Set(),statuses=[],messages=[];const engine=createEngine();
- const client=createEventSub({engine,subscribe,clock:()=>now,makeSocket:url=>{const s=new Socket(url);sockets.push(s);return s;},setTimer:(fn,ms)=>{const timer={fn,ms};timers.add(timer);return timer;},clearTimer:id=>timers.delete(id),onStatus:s=>statuses.push(s),onMessage:(input,verdict)=>messages.push({input,verdict})});
+ const client=createEventSub({engine,subscribe,clock:()=>now,makeSocket:url=>{const s=new Socket(url);sockets.push(s);return s;},setTimer:(fn,ms)=>{const timer={fn,ms};timers.add(timer);return timer;},clearTimer:id=>timers.delete(id),onStatus:s=>statuses.push(s),onMessage:(input,verdict)=>messages.push({input,verdict}),log:()=>{}});
  const welcome=(s=sockets.at(-1))=>s.message('session_welcome',{session:{id:'session',keepalive_timeout_seconds:10}});
  return {engine,client,sockets,timers,statuses,messages,welcome,time:value=>{now=value;},fire(ms){const t=[...timers].find(t=>t.ms===ms);assert.ok(t);timers.delete(t);t.fn();}};
 }
@@ -26,7 +26,7 @@ test('socket close voids current round, reconnect resubscribes and reports whole
  const f=fixture();f.client.start();f.welcome();await flush();calibrated(f.engine);f.time(3000);notification(f.sockets[0]);f.time(4000);f.sockets[0].emit('close');assert.equal(f.engine.getRound('R').status,'VOID');assert.equal(f.engine.getVerdicts()[0].code,'ROUND_VOID_GAP');f.fire(1000);f.time(9000);f.welcome();await flush();assert.equal(f.statuses.at(-1),'connected');f.client.stop();
 });
 test('keepalive timeout voids round; notification and keepalive reset timer',async()=>{
- const f=fixture();f.client.start();f.welcome();await flush();calibrated(f.engine);const prior=[...f.timers][0];f.time(5000);f.sockets[0].message('session_keepalive');assert.equal(f.timers.has(prior),false);f.time(15001);f.fire(10000);assert.equal(f.engine.getRound('R').status,'VOID');f.client.stop();
+ const f=fixture();f.client.start();f.welcome();await flush();calibrated(f.engine);const prior=[...f.timers][0];f.time(5000);f.sockets[0].message('session_keepalive');assert.equal(f.timers.has(prior),false);f.time(16501);f.fire(11500);assert.equal(f.engine.getRound('R').status,'VOID');f.client.stop();
 });
 test('session_reconnect keeps old socket until new welcome, preserves subscriptions and has no gap',async()=>{
  let subscriptions=0;const f=fixture(async()=>subscriptions++);f.client.start();f.welcome();await flush();calibrated(f.engine);
@@ -52,8 +52,8 @@ test('401 refreshes token and retries; missing scopes or wrong client fail valid
 });
 test('Helix requests use one owner for broadcaster and bot and exact subscription transport',async()=>{
  const calls=[];let now=2000;const sockets=[];
- const auth={validate:async()=>{},getIdentity:()=>({userId:'owner',login:'owner-login'}),helix:async(path,body)=>{calls.push([path,body]);return {data:[{is_sent:true}]};}};
- const runtime=createRuntime({auth,clock:()=>now,eventSubOptions:{makeSocket:url=>{const s=new Socket(url);sockets.push(s);return s;},setTimer:()=>0,clearTimer:()=>{}}});
+ const auth={validate:async()=>{},getIdentity:()=>({userId:'owner',login:'owner-login'}),helix:async(path,body)=>{calls.push([path,body]);return path==='eventsub/subscriptions'?{data:[{id:'sub',status:'enabled',type:body.type,condition:body.condition,transport:body.transport}]}:{data:[{is_sent:true}]};}};
+ const runtime=createRuntime({auth,log:()=>{},clock:()=>now,eventSubOptions:{makeSocket:url=>{const s=new Socket(url);sockets.push(s);return s;},setTimer:()=>0,clearTimer:()=>{}}});
  await runtime.start();sockets[0].message('session_welcome',{session:{id:'session',keepalive_timeout_seconds:10}});await flush();assert.deepEqual(calls[0],['eventsub/subscriptions',{type:'channel.chat.message',version:'1',condition:{broadcaster_user_id:'owner',user_id:'owner'},transport:{method:'websocket',session_id:'session'}}]);
  const sync=runtime.startSync();assert.equal(sync.shownAt,2000);assert.deepEqual(runtime.snapshot().sync,sync);now=4500;notification(sockets[0],'s',sync.word);assert.equal(runtime.snapshot().viewers[0].dViewer,2500);
  runtime.engine.openRound({roundId:'R',openedAt:5000});runtime.engine.markEvent({roundId:'R',outcome:'land',pressedAt:6000});runtime.engine.finalizeDue(26000);await runtime.sendSummary(runtime.engine.getRound('R'));await runtime.sendSummary(runtime.engine.getRound('R'));assert.equal(calls.length,2);assert.equal(calls[1][1].sender_id,'owner');assert.equal(calls[1][1].broadcaster_id,'owner');runtime.stop();assert.throws(()=>runtime.startSync(),/Connect/);
@@ -79,4 +79,34 @@ test('local auth callback requires matching single-use state cookie; API rejects
  assert.equal((await fetch(`${url}/api/sync`,{method:'POST',headers:{...headers,Origin:'http://localhost:3000','Content-Type':'application/json'},body:'{}'})).status,200);assert.equal(syncs,1);
  assert.equal((await fetch(`${url}/api/state`)).status,403);
  assert.deepEqual(await(await fetch(`${url}/api/state`,{headers})).json(),{status:'connected',viewers:[]});
+});
+
+test('keepalive at the server timeout boundary or just after it does not disconnect', async () => {
+  const f=fixture();f.client.start();f.welcome();await flush();
+  assert.equal([...f.timers][0].ms,11500);
+  f.time(10000);f.sockets[0].message('session_keepalive');
+  assert.equal(f.statuses.at(-1),'connected');
+  f.time(20500);f.sockets[0].message('session_keepalive');
+  assert.equal(f.statuses.at(-1),'connected');
+  assert.equal(f.sockets[0].closed,undefined);
+  f.client.stop();
+});
+
+test('Helix API error body is retained for diagnostics with credentials redacted', async () => {
+  const logs=[];
+  const auth=createTwitchAuth({clientId:'client',clientSecret:'private-client-secret',accessToken:'private-access-token',refreshToken:'private-refresh-token',log:(event,details)=>logs.push({event,...details}),
+    fetchImpl:async url=>url.endsWith('/validate')?json(valid):json({error:'Forbidden',status:403,message:'Missing scope; private-client-secret private-access-token private-refresh-token'},403)});
+  await auth.validate();
+  await assert.rejects(()=>auth.helix('eventsub/subscriptions',{}),error=>error.status===403&&error.body.error==='Forbidden');
+  assert.equal(logs[0].event,'twitch.api_error');assert.match(logs[0].body.message,/Missing scope/);
+  assert.doesNotMatch(JSON.stringify(logs),/private-client-secret|private-access-token|private-refresh-token/);
+});
+
+test('failed reconnect candidate does not claim a healthy active server session is disconnected', async () => {
+  const f=fixture();f.client.start();f.welcome();await flush();calibrated(f.engine);
+  f.sockets[0].message('session_reconnect',{session:{reconnect_url:'wss://eventsub.wss.twitch.tv/ws?reconnect=test'}});
+  f.time(3000);f.sockets[1].emit('error',new Error('candidate unavailable'));
+  assert.equal(f.statuses.at(-1),'connected');assert.equal(f.engine.getRound('R').status,'OPEN');
+  notification(f.sockets[0],'still-live');assert.equal(f.engine.getVerdicts()[0].code,'ACCEPTED');
+  f.time(4000);f.sockets[0].emit('close');assert.equal(f.statuses.at(-1),'disconnected');assert.equal(f.engine.getRound('R').status,'VOID');f.client.stop();
 });

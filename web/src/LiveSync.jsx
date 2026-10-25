@@ -1,8 +1,28 @@
-import React,{useEffect,useState} from 'react';
-/** Phase 3 checks real calibration only; full live round UI is Phase 4. */
-export function LiveSync(){
- const [state,setState]=useState({status:'loading',viewers:[]}),[error,setError]=useState('');
- useEffect(()=>{let alive=true;async function poll(){try{const response=await fetch('/api/state');if(!response.ok)throw new Error();const data=await response.json();if(alive){setState(data);setError('');}}catch{if(alive)setError('Cannot reach the local Twitch server. Start it with npm start.');}}poll();const timer=setInterval(poll,1000);return()=>{alive=false;clearInterval(timer);};},[]);
- async function sync(){try{const response=await fetch('/api/sync',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});const data=await response.json();if(!response.ok)throw new Error(data.error);setState(s=>({...s,sync:data}));setError('');}catch(e){setError(e.message);}}
- return <main><div className="hero"><div><p className="eyebrow">PHASE 3 · LIVE SYNC CHECK</p><h1>Measure your chat.</h1><p className="intro">Connect your broadcaster account, then show the sync word on stream. Viewers type it back in Twitch chat.</p></div></div><section className="panel"><div className="section-head"><h2>Twitch: {state.status}</h2><a href="/auth/twitch">Connect with Twitch ↗</a></div>{state.account&&<p>Channel: {state.account}</p>}<button className="primary" disabled={state.status!=='connected'} onClick={sync}>Sync</button>{state.sync&&<div className="sync-flash"><small>SHOW THIS WORD ON STREAM</small><h1>SAY: {state.sync.word}</h1></div>}{error&&<p role="alert">{error}</p>}</section><section className="panel"><h2>Real viewer delays</h2><table><thead><tr><th>Viewer</th><th>Delay</th><th>Samples</th></tr></thead><tbody>{state.viewers.map(v=><tr key={v.userId}><td>{v.userLogin}</td><td>{v.dViewer} ms</td><td>{v.samples.length}</td></tr>)}</tbody></table>{!state.viewers.length&&<p>Waiting for sync replies.</p>}</section><p>OBS sync overlay: <a href="/overlay?live=1">/overlay?live=1</a>. Live round controls will be connected in Phase 4.</p><a href="/judge">Open simulated replay ↗</a></main>;
+import React, {useEffect, useState} from 'react';
+import {watchLiveState, liveConnectionLabel} from './live-state.js';
+import {ViewerDelays} from './ViewerDelays.js';
+/** Phase 3 checks real calibration only; chat processing always runs in Node. */
+export function LiveSync() {
+  const [state, setState] = useState(null), [connectionError, setConnectionError] = useState(''), [syncError, setSyncError] = useState('');
+  useEffect(() => watchLiveState({intervalMs: 1000,
+    onState: next => {setState(next); setConnectionError('');}, onError: setConnectionError
+  }), []);
+  async function sync() {
+    try {
+      const response = await fetch('/api/sync', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}'});
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error);
+      setState(current => ({...current, sync: data, syncActive: true})); setSyncError('');
+    } catch (error) {setSyncError(error.message);}
+  }
+  return <main><div className="hero"><div><p className="eyebrow">PHASE 3 · LIVE SYNC CHECK</p><h1>Measure your chat.</h1><p className="intro">Connect your broadcaster account, then show the sync word on stream. Viewers type it back in Twitch chat.</p></div></div>
+    <section className="panel"><div className="section-head"><h2 role="status">{liveConnectionLabel(state, connectionError)}</h2><a href="/auth/twitch">Connect with Twitch ↗</a></div>
+      {state?.account && <p>Channel: {state.account}</p>}
+      <button className="primary" disabled={!!connectionError || state?.status !== 'connected'} onClick={sync}>Sync</button>
+      {!connectionError && state?.sync && (state.syncActive === false ? <p>Sync window ended. Press Sync again.</p> : <div className="sync-flash"><small>SHOW THIS WORD ON STREAM · REPLY WITHIN 15 SECONDS</small><h1>SAY: {state.sync.word}</h1></div>)}
+      {syncError && <p role="alert">{syncError}</p>}
+    </section>
+    <ViewerDelays viewers={state?.viewers ?? []}/>
+    <p>OBS sync overlay: <a href="/overlay?live=1">/overlay?live=1</a>. Live round controls will be connected in Phase 4.</p><a href="/judge">Open simulated replay ↗</a>
+  </main>;
 }

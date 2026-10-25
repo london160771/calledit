@@ -4,7 +4,7 @@
 - **Phase 0** (owner): pending Gate 0 delay test. Codex skipped it as instructed.
 - **Phase 1** (Codex): complete, pushed as `47e017a`.
 - **Phase 2** (Codex): complete, pushed as `c851944`.
-- **Phase 3** (Codex, then owner): code complete and tested; waiting for owner credentials and a real channel sync.
+- **Phase 3** (Codex, then owner): live overlay verified by owner; chat diagnostics and reconnect fixes complete, awaiting another live calibration test.
 - **Phases 4 and 5**: not started. Resume Phase 4 after the owner verifies Phase 3.
 
 ## Done
@@ -36,13 +36,11 @@
 - Local Phase 3 server binds to loopback and checks Host and write Origin. Hosting configuration remains Phase 5.
 
 ## Pending (owner)
-1. Enable Twitch 2FA and register a confidential Developer Console app with redirect `http://localhost:3000/auth/callback`.
-2. Copy .env.example to .env and set TWITCH_CLIENT_ID and TWITCH_CLIENT_SECRET. Keep the default TWITCH_REDIRECT_URI; access/refresh tokens are optional.
-3. Run `npm run build -w web` and `npm start`, then open `http://localhost:3000/dashboard?liveSync=1`.
-4. Connect using the broadcaster account, add http://localhost:3000/overlay?live=1 to OBS at 1920x1080, press Sync, and have viewers type the word they see on stream. Repeat three times and confirm real per-viewer delays appear. See server/LOCAL_TWITCH.md.
-5. Finish Gate 0: OBS test stream, fast viewer tab and iPhone on mobile data. Record at least a 2-second extra iPhone delay in evidence/gate0.md.
-6. Report the live sync result so work can resume at Phase 4.
-
+1. Restart the updated Node server with `npm start`, refresh the dashboard and OBS source, and reconnect Twitch as ayyoweb3 if needed.
+2. Keep OBS at `http://localhost:3000/overlay?live=1` (1920x1080). Open `http://localhost:3000/dashboard?liveSync=1`.
+3. Watch the Node terminal for an enabled chat subscription on ayyoweb3, start a fresh sync and have london1607 / becca160771 reply within 15 seconds. Follow server/LOCAL_TWITCH.md to inspect recorded/rejected sample logs and report the results.
+4. Finish Gate 0: record at least a 2-second extra iPhone delay versus the fast tab in evidence/gate0.md.
+5. Resume Phase 4 only after the live calibration is verified. No deployment is authorized.
 ## Log
 - 2026-10-24: Docs initialized and pushed; Phases 1 and 2 completed and pushed.
 - 2026-10-24: Phase 3 Codex portion complete, 36 tests passed. Stopping for owner credentials and manual Twitch sync as required by AGENTS.md and PRD §10.
@@ -56,3 +54,15 @@
 - Verification: `npm test` passed, **40 passed, 0 failed** (engine 19, server 13, web 8), plus Vite production build. Four new regression tests cover explicit mode, following new server words with unchanged timestamps, disconnection recovery, and cleanup; the existing runtime test now asserts the same sync timestamp reaches snapshots.
 - Browser check used a local fake Twitch session, not the owner's channel: clicked Sync on one dashboard tab; a separately opened overlay tab displayed LIVE (Twitch) / SAY: MANGO with server shownAt 123000. Centered layout inspected; HTML/body computed backgrounds both transparent.
 - Owner: rebuild/restart the local server, refresh OBS with the documented live URL, reconnect Twitch if needed, and check a live sync on stream. Stopping after this fix as requested.
+
+## Phase 3 chat diagnostics and connection fixes — 2026-10-25
+- Owner reports live sync words reach OBS, but replies from london1607 / becca160771 on ayyoweb3 do not create delay rows; dashboard sometimes reports disconnected after backgrounding.
+- Read-only inspection of the running old server returned connected / ayyoweb3 / no viewer samples. No historical message/rejection logs existed. No access token is saved in .env; the current OAuth token is held only in that Node process, so a separate read-only subscription query could not inspect it. The running owner process was not stopped or changed. The exact reason for those past replies remains unverified.
+- Confirmed code faults: subscription responses were never checked for enabled status/channel/session; the keepalive watchdog was armed at exactly the advertised timeout, racing normal keepalives and network jitter; failed replacement sockets could mark a still-healthy active session disconnected; expired words stayed visible while the engine silently ignored replies outside the fixed 15-second window. Case/outer-space matching and real payload field mapping were already correct in the engine/adapter.
+- Fixes: verify enabled subscription and expected channel/user/session before connected; log connect/open/welcome/subscription result/API errors/notifications/each chat/rejected or recorded sample. API error bodies retain diagnostic details while known OAuth credentials are redacted. Chat text is JSON-escaped.
+- Server watchdog allows 1500 ms transport/scheduler jitter and retains gap reporting from the last healthy receipt. Failed reconnect candidates leave a healthy old socket active. All EventSub sockets, clock stamping, sync matching and engine state stay in Node; no browser lifecycle controls them.
+- Both live pages use sequential polls, 5-second request timeouts, capped backoff from 500 ms to 10 seconds, and immediate refresh on visibility/online events. Browser-only transport failures display Reconnecting to CalledIt server, without changing the cached server Twitch state. Stale in-flight responses cannot overwrite refreshed data.
+- Added server sync expiresAt/syncActive metadata and expired-word prompts. Original server shownAt, 15000 ms sync window, sample minimum and pure engine remain unchanged.
+- Tests: final `npm test` passed **50 passed, 0 failed** (engine 19, server 16, web 15) plus Vite production build. Full real-shaped channel.chat.message envelopes for both named viewers pass through Node, /api/state and the actual dashboard table component without browser polling, with case/spaces and two sync IDs. Rejection logs, expired replies, duplicate deliveries, invalid subscription, redaction, keepalive boundary, candidate failure, capped backoff, visibility/online recovery and stale response protection are covered.
+- Files: server/src/auth.js, server/src/eventsub.js, server/src/runtime.js, server/src/log.js, server/test/twitch.test.js, web/src/live-state.js, web/src/LiveSync.jsx, web/src/LiveOverlay.js, web/src/ViewerDelays.js, web/test/live-chat.test.js, web/test/live-overlay.test.js, server/LOCAL_TWITCH.md, PROJECT_STATE.md.
+- Decision: retain the PRD timing contract; make expiry explicit rather than extend calibration times. No Phase 4 work or deployment. Stop after commit/push for the requested owner live test.

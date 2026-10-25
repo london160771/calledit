@@ -1,6 +1,7 @@
+import {logEvent} from './log.js';
 export const scopes = ['user:read:chat','user:write:chat','user:bot'];
-/** OAuth credentials stay in server memory. HTTP errors never include response bodies or tokens. */
-export function createTwitchAuth({clientId,clientSecret,redirectUri,accessToken,refreshToken,fetchImpl=fetch}) {
+/** OAuth credentials stay in server memory. API error bodies are redacted before logging. */
+export function createTwitchAuth({clientId,clientSecret,redirectUri,accessToken,refreshToken,fetchImpl=fetch,log=logEvent}) {
   let tokens={access_token:accessToken,refresh_token:refreshToken}, identity, refreshing;
   async function tokenRequest(params) {
     const response=await fetchImpl('https://id.twitch.tv/oauth2/token',{method:'POST',body:new URLSearchParams({client_id:clientId,client_secret:clientSecret,...params}),signal:AbortSignal.timeout(10000)});
@@ -33,7 +34,21 @@ export function createTwitchAuth({clientId,clientSecret,redirectUri,accessToken,
     async helix(path,body){
       if(!identity)throw new Error('Connect with Twitch first.');
       const response=await authorized(`https://api.twitch.tv/helix/${path}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-      if(!response.ok)throw new Error(`Twitch API failed (${response.status}).`);
+      if(!response.ok) {
+        let body;
+        try { body = await response.json(); } catch { body = {message: 'Unreadable Twitch error body.'}; }
+        // Helix error bodies are useful for missing scopes/invalid subscriptions; tokens are not.
+        const safe = JSON.stringify(body, (key, value) => {
+          if (/^(access_token|refresh_token|client_secret|authorization)$/i.test(key)) return '[REDACTED]';
+          if (typeof value !== 'string') return value;
+          for (const secret of [clientSecret, tokens.access_token, tokens.refresh_token].filter(Boolean)) value = value.split(secret).join('[REDACTED]');
+          return value.replace(/Bearer\s+[^\s"\\]+/gi, 'Bearer [REDACTED]');
+        });
+        const redacted = JSON.parse(safe);
+        log('twitch.api_error', {path, status: response.status, body: redacted});
+        const error = new Error(`Twitch API failed (${response.status}).`);
+        error.status = response.status; error.body = redacted; throw error;
+      }
       return response.json();
     },
     getIdentity(){return identity?{...identity}:null;},
