@@ -12,7 +12,7 @@
 - Phase 1: npm workspaces; pure dependency-free engine; fixed Seed-7 fixture; prefix replay; baseline comparison; Node 22 GitHub Actions workflow.
 - Phase 2: React + Vite and plain CSS; /judge browser replay; simulated /dashboard and transparent /overlay; Attack Lab for all eight reason codes.
 - Phase 3: Express local server; authorization-code OAuth with state cookie; scope/client validation; token refresh; hourly validation; EventSub chat subscription; server-clock arrival timestamps; chat message ID deduplication; close/timeout gap reporting and recovery; reconnect handoff; one summary attempt per finished round with rate spacing.
-- /dashboard?liveSync=1 provides the owner's local Phase 3 calibration check. Full live round controls and live OBS overlay wiring remain Phase 4.
+- /dashboard?liveSync=1 provides the owner's local Phase 3 calibration check. Live sync words now reach OBS at /overlay?live=1. Live round controls and verdict wiring remain Phase 4.
 - .env.example and server/LOCAL_TWITCH.md explain the exact required values and manual steps. No credentials were created or committed. Nothing was deployed.
 
 ## Verification
@@ -39,10 +39,20 @@
 1. Enable Twitch 2FA and register a confidential Developer Console app with redirect `http://localhost:3000/auth/callback`.
 2. Copy .env.example to .env and set TWITCH_CLIENT_ID and TWITCH_CLIENT_SECRET. Keep the default TWITCH_REDIRECT_URI; access/refresh tokens are optional.
 3. Run `npm run build -w web` and `npm start`, then open `http://localhost:3000/dashboard?liveSync=1`.
-4. Connect using the broadcaster account, press Sync, show the word on stream, and have viewers type it back. Repeat three times and confirm real per-viewer delays appear. See server/LOCAL_TWITCH.md.
+4. Connect using the broadcaster account, add http://localhost:3000/overlay?live=1 to OBS at 1920x1080, press Sync, and have viewers type the word they see on stream. Repeat three times and confirm real per-viewer delays appear. See server/LOCAL_TWITCH.md.
 5. Finish Gate 0: OBS test stream, fast viewer tab and iPhone on mobile data. Record at least a 2-second extra iPhone delay in evidence/gate0.md.
 6. Report the live sync result so work can resume at Phase 4.
 
 ## Log
 - 2026-10-24: Docs initialized and pushed; Phases 1 and 2 completed and pushed.
 - 2026-10-24: Phase 3 Codex portion complete, 36 tests passed. Stopping for owner credentials and manual Twitch sync as required by AGENTS.md and PRD §10.
+
+## Phase 3 live sync overlay fix — 2026-10-25
+- Scope: only the reported sync delivery bug; Phase 4 has not started.
+- Added explicit live mode at `http://localhost:3000/overlay?live=1`. It reads the server session directly instead of simulated local storage, so OBS can follow dashboard syncs across browser storage boundaries.
+- The transparent live overlay shows LIVE (Twitch) and a large centered word. It hides old words on disconnect/request failure and recovers automatically.
+- Decision: sequential polling every 100 ms after each completed request; server `shownAt` remains exactly the sync start time. No engine or runtime timing changes. Poll/render overhead remains part of measured delay.
+- Changed: web/src/LiveOverlay.js, web/src/live-state.js, web/src/main.jsx, web/src/LiveSync.jsx, web/src/style.css, web/test/live-overlay.test.js, server/test/twitch.test.js, server/LOCAL_TWITCH.md, PROJECT_STATE.md.
+- Verification: `npm test` passed, **40 passed, 0 failed** (engine 19, server 13, web 8), plus Vite production build. Four new regression tests cover explicit mode, following new server words with unchanged timestamps, disconnection recovery, and cleanup; the existing runtime test now asserts the same sync timestamp reaches snapshots.
+- Browser check used a local fake Twitch session, not the owner's channel: clicked Sync on one dashboard tab; a separately opened overlay tab displayed LIVE (Twitch) / SAY: MANGO with server shownAt 123000. Centered layout inspected; HTML/body computed backgrounds both transparent.
+- Owner: rebuild/restart the local server, refresh OBS with the documented live URL, reconnect Twitch if needed, and check a live sync on stream. Stopping after this fix as requested.

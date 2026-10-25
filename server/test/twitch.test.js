@@ -55,7 +55,7 @@ test('Helix requests use one owner for broadcaster and bot and exact subscriptio
  const auth={validate:async()=>{},getIdentity:()=>({userId:'owner',login:'owner-login'}),helix:async(path,body)=>{calls.push([path,body]);return {data:[{is_sent:true}]};}};
  const runtime=createRuntime({auth,clock:()=>now,eventSubOptions:{makeSocket:url=>{const s=new Socket(url);sockets.push(s);return s;},setTimer:()=>0,clearTimer:()=>{}}});
  await runtime.start();sockets[0].message('session_welcome',{session:{id:'session',keepalive_timeout_seconds:10}});await flush();assert.deepEqual(calls[0],['eventsub/subscriptions',{type:'channel.chat.message',version:'1',condition:{broadcaster_user_id:'owner',user_id:'owner'},transport:{method:'websocket',session_id:'session'}}]);
- const sync=runtime.startSync();now=4500;notification(sockets[0],'s',sync.word);assert.equal(runtime.snapshot().viewers[0].dViewer,2500);
+ const sync=runtime.startSync();assert.equal(sync.shownAt,2000);assert.deepEqual(runtime.snapshot().sync,sync);now=4500;notification(sockets[0],'s',sync.word);assert.equal(runtime.snapshot().viewers[0].dViewer,2500);
  runtime.engine.openRound({roundId:'R',openedAt:5000});runtime.engine.markEvent({roundId:'R',outcome:'land',pressedAt:6000});runtime.engine.finalizeDue(26000);await runtime.sendSummary(runtime.engine.getRound('R'));await runtime.sendSummary(runtime.engine.getRound('R'));assert.equal(calls.length,2);assert.equal(calls[1][1].sender_id,'owner');assert.equal(calls[1][1].broadcaster_id,'owner');runtime.stop();assert.throws(()=>runtime.startSync(),/Connect/);
 });
 test('summaries serialize at 1600ms spacing, one attempt per round even after send failure',async()=>{
@@ -80,5 +80,3 @@ test('local auth callback requires matching single-use state cookie; API rejects
  assert.equal((await fetch(`${url}/api/state`)).status,403);
  assert.deepEqual(await(await fetch(`${url}/api/state`,{headers})).json(),{status:'connected',viewers:[]});
 });
-
-
