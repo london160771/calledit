@@ -11,8 +11,23 @@ Channel: **ayyoweb3**. Real Twitch sync replies were recorded and confirmed by `
 
 These are owner-reported live results. They prove calibration through the Twitch pipeline; they are not a measurement of pure video lag because sync delay includes reaction time and chat delivery.
 
-## Gate 0 viewer spread: PENDING (owner setup)
+## Gate 0 viewer spread: PASSED (owner report, 2026-10-28)
 
-The required iPhone-versus-fast-tab spread of at least 2 seconds has **not** been demonstrated. The difference between the two reported calibration values is only **129 ms** (11337 - 11208), so these numbers do not pass Gate 0.
+Live test on **ayyoweb3**, after a fresh server restart, using three syncs in order: **PEACH, PAPAYA, MANGO**, with the **45 s live window**.
 
-Owner still needs to arrange the fast viewer and iPhone/mobile-data setup, measure the spread, and record the result here. This is a pending setup task, not a reported code failure. The Phase 4 money shot remains unverified until the owner runs and records it.
+| Viewer | Device / demo role | PEACH | PAPAYA | MANGO | D_v (minimum) | Same-viewer variation (max - min) |
+|---|---|---:|---:|---:|---:|---:|
+| london1607 | iPhone / fast viewer | 12366 ms | 13065 ms | 13325 ms | 12366 ms | 959 ms (0.96 s) |
+| becca160771 | Laptop, Low Latency OFF / slow viewer | 20574 ms | 19111 ms | 18374 ms | 18374 ms | 2200 ms (2.2 s) |
+
+Spread: **18374 - 12366 = 6008 ms (6.0 s)**, exceeding the **at least 2 s** target: **PASS**. This supersedes the earlier pending spread: the previous Phase 3 calibration values above differed by only 129 ms.
+
+Honest limit: the laptop's **2.2 s** same-viewer variation exceeds the **1.0 s** target. Human reaction time is the owner's likely explanation, not a verified cause. D_v includes reaction time and chat delivery as well as stream delay; passing the spread check does not establish stable pure video lag.
+
+An unrelated real viewer, **mashaliahbratha**, chatted during the test and was correctly ignored with **NO_ACTIVE_SYNC**, according to the owner report.
+
+Owner-confirmed demo roles follow the measured delays, reversing the original device assumption in PRD §9:
+- **iPhone / london1607 = fast viewer**: expected **LATE_SAW_IT** when calling after seeing the result.
+- **Laptop / becca160771 = slow viewer**: expected **ACCEPTED** when calling before the result shows there and before the personal cutoff.
+
+These are expected Phase 4 demo verdicts, not recorded verdict results from this sync test. The Phase 4 money shot and recording remain pending.

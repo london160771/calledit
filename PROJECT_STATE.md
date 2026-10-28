@@ -1,7 +1,7 @@
 # PROJECT_STATE — CalledIt
 
 ## Current phase
-- **Phase 0** (owner): pending Gate 0 delay test. Codex skipped it as instructed.
+- **Phase 0** (owner): Gate 0 PASSED, owner-reported 2026-10-28 on ayyoweb3. Measured fast/slow spread 6008 ms (6.0 s); iPhone is fast and laptop is slow. Evidence and variation limit are in evidence/gate0.md.
 - **Phase 1** (Codex): complete, pushed as `47e017a`.
 - **Phase 2** (Codex): complete, pushed as `c851944`.
 - **Phase 3** (Codex, then owner): PASSED. Owner confirmed real live syncs on ayyoweb3: london1607 11337 ms and becca160771 11208 ms, three samples each, with sync.recorded logs.
@@ -39,7 +39,7 @@
 ## Pending (owner)
 1. Rebuild with `npm run build -w web`, restart `npm start`, refresh OBS and reconnect Twitch as ayyoweb3.
 2. Use `http://localhost:3000/overlay?live=1` at 1280x720 in OBS and `http://localhost:3000/dashboard?liveSync=1` for controls.
-3. Finish the pending Gate 0 viewer setup: at least 2 seconds of extra iPhone delay versus the fast tab. Record it in evidence/gate0.md and recalibrate with three syncs.
+3. Use the verified demo roles: london1607 on iPhone is fast; becca160771 on laptop with Low Latency OFF is slow. Gate 0 passed with 6.0 s spread. Recalibrate after a restart or setup change; laptop sample variation was 2.2 s, above the 1.0 s target.
 4. Follow the Phase 4 money-shot steps in server/LOCAL_TWITCH.md. Record fast LATE_SAW_IT / slow ACCEPTED, automatic Final, one summary, and a separate gap/VOID check.
 5. Report the live result and recording. Phase 5 waits for this manual handoff; no deployment is authorized.
 ## Log
@@ -89,3 +89,13 @@
 - Files: server/src/app.js, server/src/runtime.js, server/src/live-rounds.js, server/test-support/live-session.js, server/test/live-rounds.test.js, web/src/LiveSync.jsx, web/src/LiveOverlay.js, web/src/LiveRoundView.js, web/src/style.css, web/test/live-rounds.test.js, server/LOCAL_TWITCH.md, evidence/gate0.md, PROJECT_STATE.md.
 - Decisions: default options are land/miss; show only the last two verdict cards on OBS to preserve space, with twenty available on the dashboard. A voided terminal round gets one unscored VOID summary. Summary failures are logged without retry, preserving the existing at-most-one-attempt policy. No changes to engine math or deployment.
 - STOP: Codex portion complete; owner must run and record the Phase 4 money-shot steps in server/LOCAL_TWITCH.md. Phase 5 has not started.
+
+
+## Gate 0 owner pass — 2026-10-28
+- Docs-only update, following the owner's fresh-server live test on ayyoweb3. Syncs: PEACH, PAPAYA, MANGO; live window: 45 s.
+- london1607 (iPhone, fast): 12366 / 13065 / 13325 ms; D_v = 12366 ms; same-viewer variation 959 ms (0.96 s).
+- becca160771 (laptop, Low Latency OFF, slow): 20574 / 19111 / 18374 ms; D_v = 18374 ms; same-viewer variation 2200 ms (2.2 s). This exceeds the 1.0 s target. Human reaction time is a likely explanation from the owner, not a proven cause; retain it as an honest limit.
+- Gate 0 spread = 18374 - 12366 = 6008 ms (6.0 s), above the 2 s target: PASSED. This supersedes the pending spread recorded at the earlier Phase 4 handoff.
+- Owner reports unrelated real viewer mashaliahbratha was correctly ignored with NO_ACTIVE_SYNC.
+- Demo roles follow measured delays instead of the original device assumption: iPhone fast, expected LATE_SAW_IT after seeing the result; laptop slow, expected ACCEPTED before it shows and before the personal cutoff. Phase 4 money-shot verdicts and recording remain pending.
+- Changed only evidence/gate0.md and PROJECT_STATE.md. Checked sample minima, max-minus-min variation and spread; git diff --check passed. No code changed, so npm test/build were not rerun. No deployment or phase progression.
