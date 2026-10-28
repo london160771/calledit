@@ -30,4 +30,4 @@ Owner-confirmed demo roles follow the measured delays, reversing the original de
 - **iPhone / london1607 = fast viewer**: expected **LATE_SAW_IT** when calling after seeing the result.
 - **Laptop / becca160771 = slow viewer**: expected **ACCEPTED** when calling before the result shows there and before the personal cutoff.
 
-These are expected Phase 4 demo verdicts, not recorded verdict results from this sync test. The Phase 4 money shot and recording remain pending.
+These were expected demo verdicts at this sync test, not observed round verdicts from calibration alone. A later Phase 4 live money shot PASSED with sammiedfab slow and london1607 fast; see [money-shot.md](money-shot.md). Recording/link and the separate live gap check remain pending.

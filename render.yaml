@@ -1,0 +1,20 @@
+# Owner applies this Blueprint. No deployment is performed by Codex.
+services:
+  - type: web
+    name: calledit
+    runtime: node
+    plan: free
+    numInstances: 1
+    autoDeployTrigger: "off"
+    buildCommand: npm ci --include=dev && npm run build -w web
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: LIVE_SYNC_WINDOW_MS
+        value: "45000"
+      - key: LIVE_MAX_DELAY_MS
+        value: "45000"

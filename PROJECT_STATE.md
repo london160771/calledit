@@ -6,7 +6,7 @@
 - **Phase 2** (Codex): complete, pushed as `c851944`.
 - **Phase 3** (Codex, then owner): PASSED. Owner confirmed real live syncs on ayyoweb3: london1607 11337 ms and becca160771 11208 ms, three samples each, with sync.recorded logs.
 - **Phase 4** (Codex, then owner): PASSED, owner-reported live round round-1793192469925-3 on 2026-10-28. Slow ACCEPTED · CORRECT, fast LATE_SAW_IT, finalization and one summary confirmed. Recording/link and separate live gap test remain pending; see evidence/money-shot.md.
-- **Phase 5**: Codex documentation and single-service hosting configuration in progress, as explicitly requested after the Phase 4 live pass. No deployment authorized.
+- **Phase 5** (Codex, then owner): Codex part complete and verified in a clean local clone with the candidate changes. README, REAL_VS_MOCKED.md, one-service render.yaml and DEPLOY.md are ready. Owner deployment, hosted smoke check, recording/session ID and submission remain pending. Nothing deployed.
 
 ## Done
 - Docs setup and .gitignore pushed as `1fe9f35`.
@@ -34,14 +34,15 @@
 - Simulated dashboard uses a deterministic clock and local storage to share its feed across tabs. /judge has no runtime server dependency after its static files load.
 - Phase 3 uses one account as broadcaster and bot, derived from the validated user token. Tokens remain in server memory; restart requires sign-in again unless optional .env tokens work.
 - Summary sends use one attempt per round, even after an ambiguous network failure, to avoid duplicate chat messages. They serialize at least 1600 ms apart and are wired to live finalization and voiding.
-- Local Phase 3 server binds to loopback and checks Host and write Origin. Hosting configuration remains Phase 5.
+- Local server binds to loopback and checks Host/write Origin. Hosted mode binds to Render PORT on 0.0.0.0, requires HTTPS and an owner password for live controls; public OBS/state reads contain no credentials.
 
 ## Pending (owner)
-1. Rebuild with `npm run build -w web`, restart `npm start`, refresh OBS and reconnect Twitch as ayyoweb3.
-2. Use `http://localhost:3000/overlay?live=1` at 1280x720 in OBS and `http://localhost:3000/dashboard?liveSync=1` for controls.
-3. Use the verified demo roles: london1607 on iPhone is fast; becca160771 on laptop with Low Latency OFF is slow. Gate 0 passed with 6.0 s spread. Recalibrate after a restart or setup change; laptop sample variation was 2.2 s, above the 1.0 s target.
-4. Follow the Phase 4 money-shot steps in server/LOCAL_TWITCH.md. Record fast LATE_SAW_IT / slow ACCEPTED, automatic Final, one summary, and a separate gap/VOID check.
-5. Report the live result and recording. Phase 5 waits for this manual handoff; no deployment is authorized.
+1. Apply render.yaml yourself or create ONE Render Node Web Service from main, following DEPLOY.md. Keep automatic deploys off and one instance/process. Verify /judge first without Twitch values.
+2. Register the exact public /auth/callback in Twitch; set TWITCH_CLIENT_ID, TWITCH_CLIENT_SECRET and DASHBOARD_PASSWORD in Render. Do not upload the local .env. Live window/cap remain 45000 ms.
+3. Sign in to the hosted dashboard as HTTP Basic owner with that password, connect Twitch as ayyoweb3, switch OBS to the public /overlay?live=1 URL at 1280x720, and recalibrate. Stop the old local live session when switching hosts.
+4. Verify the four follow-up fixes on stream: own bot messages ignored, plain stale/rejection text, blocked-count summary, final cards retained until next round/sync. Complete the still-pending live gap/VOID check without killing Node; a restart is not gap evidence.
+5. Record/link the demo, add the actual Codex session ID/build footage and live evidence, then submit on Devpost yourself. See DEPLOY.md. No deployment was performed by Codex.
+
 ## Log
 - 2026-10-24: Docs initialized and pushed; Phases 1 and 2 completed and pushed.
 - 2026-10-24: Phase 3 Codex portion complete, 36 tests passed. Stopping for owner credentials and manual Twitch sync as required by AGENTS.md and PRD §10.
@@ -106,3 +107,16 @@
 - Earlier stale take correctly rejected all calls as STALE_SYNC after 10 minutes. Calls before LANDED were correctly provisionally ACCEPTED. Live gap test remains PENDING; fake-payload gap coverage is not live evidence.
 - Follow-up scope: ignore the shared broadcaster/bot account before engine handling, replace epoch timestamps with plain rejection guidance and captured sync age, include blocked verdict totals/codes in the one final summary, and retain final OBS cards until the next round or sync. New sync clearing survives expiry/reload. Engine files, verdict shape and Seed-7 remain unchanged.
 - Follow-up verification: npm test passed **70 passed, 0 failed** (engine 19, server 27, web 24); production build passed. Added fake-payload coverage for ignored own-account syncs/calls/summary echoes, direct blocked-call summary counts, final-card retention and clearing, and captured stale-sync ages with human-readable reasons.
+
+
+## Phase 5 Codex handoff — 2026-10-28
+- Added README.md covering problem, measured-clock guarantee, live/solo setup, unchanged Seed-7 numbers and 2/2/0 comparison, owner-reported evidence, official rubric-to-evidence map, honest limits and how Codex was used. Added REAL_VS_MOCKED.md and DEPLOY.md with explicit unverified boundaries and exact owner actions.
+- Added render.yaml for ONE Node web service, one instance, Node 22, auto deploys off, build npm ci --include=dev && npm run build -w web, start npm start, health /healthz. The owner chooses/applies the Free plan or an always-on alternative; no hosting service was created.
+- Node can start without Twitch credentials and serve the built /judge. Live controls decline unconfigured Twitch. Hosted startup reads Render URL/PORT, uses a matching HTTPS callback, and binds 0.0.0.0; local defaults remain loopback. Hosted OAuth/live control writes use HTTP Basic owner + DASHBOARD_PASSWORD, keeping OBS/state reads public. Case-insensitive/trailing-slash routes retain owner protection. This is necessary to avoid exposing formerly loopback-only controls on a public service.
+- Verification: final npm test **74 passed, 0 failed** (engine 19, server 31, web 24); production build passed. Fresh local clone with the candidate patch, no .env or copied node_modules: npm install added 88 packages, audit found 0 vulnerabilities; npm test passed with the same counts, explicit production build passed, and the real replay-only Node startup smoke check served /judge, JS/CSS assets, dashboard/overlay, health/state and rejected unconfigured Twitch controls. A local ownership check initially blocked cloning; process-scoped safe-directory entries resolved it without global config changes.
+- The first clean-clone production smoke check caught Express rejecting index.html under a dot-prefixed clone directory. Serving index.html relative to the explicit web/dist root fixed it; final checks passed in that same clean clone. The smoke script is server/test-support/verify-production.js, run after building.
+- Render YAML parsed locally and matched the documented one-service/one-instance/no-auto-deploy fields. It was not submitted to Render or validated through a live deployment. Engine files/dependencies/defaults/Seed-7 remain unchanged. No secrets were read or committed.
+- Decisions: loaded /judge is independent of Twitch/API, but its first load must wake a sleeping service; no unsupported offline availability claim. Live state is in memory, so reconnect/resync after restart and keep one process. Existing one-summary-attempt semantics remain, including no retry after ambiguous failure. The live gap test and recording/public links remain pending, not fabricated.
+- Files: README.md, REAL_VS_MOCKED.md, DEPLOY.md, render.yaml, .env.example, server/LOCAL_TWITCH.md, server/src/app.js, server/src/index.js, server/src/server-config.js, server/test/hosting.test.js, server/test-support/verify-production.js, evidence/gate0.md, PROJECT_STATE.md.
+- STOP: Codex part complete. Owner must deploy, verify hosted behavior and the pending gap test, record/link the demo and Codex session, and submit. No deploy commands were run.
+- Final visual check: isolated fake session at 1280x720 showed both numeric money-shot cards after Final and Chat summary: sent, including after a bot summary echo. Headless screenshot inspected; this is synthetic QA, not the owner live evidence. Temporary QA processes and clean-clone folders were removed afterward.

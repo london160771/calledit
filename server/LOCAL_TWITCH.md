@@ -13,7 +13,7 @@ No deployment is needed. The live dashboard controls syncs and rounds; the live 
 
 The live overlay polls `/api/state` every 100 ms after each successful request; the dashboard polls every 500 ms. Both retry failed requests with backoff (500 ms, 1 s, 2 s, 4 s, 8 s, then 10 s maximum), time out stalled requests after 5 seconds, and immediately refresh when the browser tab becomes visible or the network returns. A browser-only outage shows **Reconnecting to CalledIt server...**, not **Twitch: disconnected**. Twitch status comes only from the Node server. It uses the server's existing `syncId`, word and `shownAt`; loading or refreshing OBS does not start a sync or change its timestamp. Polling and rendering add a small delay to the measured sample. If Twitch disconnects or the server cannot be reached, the overlay hides the old word and shows connection status; it resumes automatically when the connection returns. `/overlay` without `?live=1` remains simulated. Both live surfaces show the same seconds-left countdown from server state. Expired sync words are hidden after the configured live window (45 seconds by default); press Sync again for a fresh word. Pure engine defaults and Seed-7 remain unchanged.
 
-The Phase 3 server listens only on loopback. Use the exact localhost addresses above. Tokens stay in server memory and are never returned to the browser or logged. Sign in again after a restart; optional .env tokens may be supplied instead. Rotated refresh tokens remain in memory, so sign in again if saved tokens stop working.
+The local server listens only on loopback; hosted Phase 5 setup is in ../DEPLOY.md. Use the exact localhost addresses above. Tokens stay in server memory and are never returned to the browser or logged. Sign in again after a restart; optional .env tokens may be supplied instead. Rotated refresh tokens remain in memory, so sign in again if saved tokens stop working.
 
 Fake-message tests cover authorization, chat subscriptions, server-clock timestamps, duplicate deliveries, keepalive timeouts, connection loss, reconnect handoff, and summary limits. Overlay regression tests cover live mode selection, following new server syncs, unchanged timestamps, disconnection recovery and cleanup. A real Twitch/OBS connection still needs the owner's live check above.
 
@@ -59,10 +59,10 @@ The pure engine retains syncWindowMs 15000 and maxDelayMs 20000. Seed-7, /judge,
 
 ## Phase 4: owner money-shot test
 
-Phase 3 live sync PASSED on ayyoweb3: london1607 11337 ms and becca160771 11208 ms, three samples each, confirmed by sync.recorded logs. Gate 0's 2-second viewer spread is still pending owner setup; see evidence/gate0.md. Those two measured delays differ by only 129 ms.
+Phase 3 live sync PASSED on ayyoweb3: london1607 11337 ms and becca160771 11208 ms, three samples each, confirmed by sync.recorded logs. The later Gate 0 test PASSED with 6008 ms spread (iPhone fast / laptop slow); see evidence/gate0.md. These earlier calibration values differ by only 129 ms and remain historical Phase 3 evidence. Phase 4 later PASSED with sammiedfab slow and london1607 fast; see evidence/money-shot.md.
 
 1. Rebuild, restart and sign in using the steps above. Keep the Node terminal visible. Check subscription.created is enabled on ayyoweb3. Set the OBS browser source to http://localhost:3000/overlay?live=1 at 1280x720; refresh it after rebuilding.
-2. Set up the fast tab and slow iPhone with at least 2 seconds of measured spread. Press Sync three times; both accounts reply to each new word when they see it on stream. Confirm three samples and valid delays on http://localhost:3000/dashboard?liveSync=1. Calibration includes reaction and chat delivery, so resync after changing viewer setup.
+2. Use measured roles: the owner verified iPhone fast and laptop (Low Latency OFF) slow. Keep at least 2 seconds of measured spread. Press Sync three times; both accounts reply to each new word when they see it on stream. Confirm three samples and valid delays on http://localhost:3000/dashboard?liveSync=1. Calibration includes reaction and chat delivery, so resync after changing viewer setup.
 3. Click Open round (land / miss). Look for round.opened and Open on the overlay. For this round, keep the two demonstration accounts from calling before the event: the first counted call per viewer is the one that counts.
 4. Perform the event and immediately click LANDED (or MISSED for a separate miss round). The Node server supplies pressedAt/eventAt. Look for event.marked, the outcome and Event marked with the finalization countdown.
 5. For the land money shot, the fast account waits until it sees the outcome, then sends !land. The slow account sends !land while it has not yet seen the outcome. Send before that viewer's personal cutoff, not at its last instant. Expect call.received then verdict: fast LATE_SAW_IT, slow ACCEPTED. Each cutoff is eventAt + measured delay - 300 ms; the overlay displays the call/cutoff comparison. The dashboard can expand the exact engine verdict and numbers. A pre-event provisional call is rechecked when the event is marked.
@@ -73,3 +73,12 @@ Phase 3 live sync PASSED on ayyoweb3: london1607 11337 ms and becca160771 11208 
 Open, mark and Void are loopback-only JSON POST actions with the same Origin checks as Sync. Marking uses only the Node clock; browser timestamps are ignored. Node timers finalize at eventAt + the live maxDelayMs even with all browser tabs closed; chat arriving after a due time also triggers finalization before judging. The live engine receives the existing 45000 ms window/cap overrides; engine defaults, Seed-7 and the simulated pages stay unchanged.
 
 The overlay shows the last two verdict cards and last four calls to keep the OBS view readable; the dashboard exposes the latest twenty calls/verdicts and exact numbers. A connection gap remains visible as VOID even while Twitch is disconnected. Browser transport recovery remains separate from Twitch session status.
+
+
+## Follow-up fixes and hosting
+
+The Node adapter ignores the shared broadcaster/bot account before sync/call handling and logs chat.ignored / OWN_ACCOUNT. Summary messages include blocked totals and unique reason codes, including direct LATE_SAW_IT calls outside the counted-calls array.
+
+STALE_SYNC cards show age captured at call time, e.g. Last sync 13 min ago — sync again. Other rejection guidance avoids epoch timestamps; exact raw numbers remain in dashboard details/logs. Final OBS cards persist after later chat until the next round opens or Sync starts. Expiring the new sync never resurrects old cards.
+
+See [DEPLOY.md](../DEPLOY.md) for single-service Render steps. Hosted live controls use an owner password over HTTPS; local controls retain loopback/Origin checks. /judge runs without Twitch env values. Nothing was deployed by Codex.
