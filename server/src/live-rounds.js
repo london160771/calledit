@@ -1,7 +1,8 @@
 /** Live round orchestration. The engine still owns every verdict and cutoff calculation. */
 export function createLiveRounds({engine, config, clock, sendSummary, log, setTimer = setTimeout, clearTimer = clearTimeout}) {
   const ids = [], previousStatus = new Map(), previousVerdicts = new Map(), timers = new Map(), summaries = new Map(), voidReasons = new Map();
-  const calls = [];
+  const calls = [], verdictContext = {}, terminalVerdicts = new Map();
+  let overlayVisible = false;
   let currentId, sequence = 0;
   function publishVerdicts() {
     engine.getVerdicts().forEach((verdict, index) => {
@@ -24,9 +25,11 @@ export function createLiveRounds({engine, config, clock, sendSummary, log, setTi
         voidReasons.set(roundId, reason);
         log('round.voided', {roundId, reason});
       } else log('round.finalized', {roundId, eventAt: round.eventAt, finalizedAt: clock(), dueAt: round.eventAt + config.maxDelayMs});
+      const verdicts = engine.getVerdicts().filter(verdict => verdict.roundId === roundId);
+      terminalVerdicts.set(roundId, verdicts);
       if (summaries.has(roundId)) continue;
       summaries.set(roundId, {status: 'pending'});
-      void sendSummary(round).then(sent => {
+      void sendSummary(round, verdicts).then(sent => {
         if (!sent) return;
         summaries.set(roundId, {status: 'sent'});
         log('summary.sent', {roundId, roundStatus: round.status});
@@ -53,7 +56,9 @@ export function createLiveRounds({engine, config, clock, sendSummary, log, setTi
     handleMessage(input) {
       finalizeDue(input.receivedAt);
       if (['!land', '!miss'].includes(input.text.trim().toLowerCase())) log('call.received', {...input, roundId: currentId ?? null});
+      const viewer = engine.getViewer(input.userId);
       const verdict = engine.handleMessage(input);
+      if (verdict && viewer) verdictContext[input.messageId] = {syncAgeMs: input.receivedAt - viewer.latestSyncAt};
       if (verdict) calls.push({messageId: input.messageId, userLogin: input.userLogin, text: input.text, receivedAt: input.receivedAt, roundId: verdict.roundId});
       reconcile(); return verdict;
     },
@@ -67,11 +72,12 @@ export function createLiveRounds({engine, config, clock, sendSummary, log, setTi
   }
   return {
     eventEngine,
+    clearOverlay() {overlayVisible = false;},
     openRound() {
       finalizeDue();
       const openedAt = clock(), roundId = `round-${openedAt}-${++sequence}`;
       engine.openRound({roundId, options: ['land', 'miss'], openedAt});
-      currentId = roundId; ids.push(roundId);
+      currentId = roundId; ids.push(roundId); overlayVisible = true;
       log('round.opened', {roundId, options: ['land', 'miss'], openedAt}); reconcile();
       return engine.getRound(roundId);
     },
@@ -97,6 +103,9 @@ export function createLiveRounds({engine, config, clock, sendSummary, log, setTi
         round: round ? {...round, finalizeAt: round.eventAt == null ? null : round.eventAt + config.maxDelayMs, remainingMs: round.eventAt == null ? null : Math.max(0, round.eventAt + config.maxDelayMs - now), voidReason: voidReasons.get(currentId) ?? null} : null,
         calls: calls.filter(call => call.roundId === (currentId ?? null)).slice(-20),
         verdicts: engine.getVerdicts().filter(verdict => verdict.roundId === (currentId ?? null)).slice(-20),
+        verdictContext: Object.fromEntries(engine.getVerdicts().filter(verdict => verdict.roundId === currentId).slice(-20).map(verdict => [verdict.messageId, verdictContext[verdict.messageId] ?? {}])),
+        overlayRoundId: overlayVisible ? currentId : null,
+        overlayVerdicts: overlayVisible ? (terminalVerdicts.get(currentId) ?? engine.getVerdicts().filter(verdict => verdict.roundId === currentId)).slice(-2) : [],
         summary: summaries.get(currentId) ?? null
       };
     }

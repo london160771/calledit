@@ -5,8 +5,8 @@
 - **Phase 1** (Codex): complete, pushed as `47e017a`.
 - **Phase 2** (Codex): complete, pushed as `c851944`.
 - **Phase 3** (Codex, then owner): PASSED. Owner confirmed real live syncs on ayyoweb3: london1607 11337 ms and becca160771 11208 ms, three samples each, with sync.recorded logs.
-- **Phase 4** (Codex, then owner): Codex live round wiring and automated checks complete; owner money-shot test and recording pending.
-- **Phase 5**: not started. Stop for the Phase 4 owner handoff.
+- **Phase 4** (Codex, then owner): PASSED, owner-reported live round round-1793192469925-3 on 2026-10-28. Slow ACCEPTED · CORRECT, fast LATE_SAW_IT, finalization and one summary confirmed. Recording/link and separate live gap test remain pending; see evidence/money-shot.md.
+- **Phase 5**: Codex documentation and single-service hosting configuration in progress, as explicitly requested after the Phase 4 live pass. No deployment authorized.
 
 ## Done
 - Docs setup and .gitignore pushed as `1fe9f35`.
@@ -99,3 +99,10 @@
 - Owner reports unrelated real viewer mashaliahbratha was correctly ignored with NO_ACTIVE_SYNC.
 - Demo roles follow measured delays instead of the original device assumption: iPhone fast, expected LATE_SAW_IT after seeing the result; laptop slow, expected ACCEPTED before it shows and before the personal cutoff. Phase 4 money-shot verdicts and recording remain pending.
 - Changed only evidence/gate0.md and PROJECT_STATE.md. Checked sample minima, max-minus-min variation and spread; git diff --check passed. No code changed, so npm test/build were not rerun. No deployment or phase progression.
+
+
+## Phase 4 owner money shot and follow-up fixes — 2026-10-28
+- Owner reports PASSED on ayyoweb3, round round-1793192469925-3: sammiedfab (slow, D_v 22.3 s), call +2.3 s < cutoff +22.0 s, ACCEPTED · CORRECT; london1607 (fast, D_v 8.9 s), call +9.3 s ≥ cutoff +8.6 s, LATE_SAW_IT. round.finalized and exactly one summary.sent (1 correct, 0 wrong) confirmed. Evidence in evidence/money-shot.md; no recording/log attachment supplied.
+- Earlier stale take correctly rejected all calls as STALE_SYNC after 10 minutes. Calls before LANDED were correctly provisionally ACCEPTED. Live gap test remains PENDING; fake-payload gap coverage is not live evidence.
+- Follow-up scope: ignore the shared broadcaster/bot account before engine handling, replace epoch timestamps with plain rejection guidance and captured sync age, include blocked verdict totals/codes in the one final summary, and retain final OBS cards until the next round or sync. New sync clearing survives expiry/reload. Engine files, verdict shape and Seed-7 remain unchanged.
+- Follow-up verification: npm test passed **70 passed, 0 failed** (engine 19, server 27, web 24); production build passed. Added fake-payload coverage for ignored own-account syncs/calls/summary echoes, direct blocked-call summary counts, final-card retention and clearing, and captured stale-sync ages with human-readable reasons.

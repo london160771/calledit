@@ -8,14 +8,15 @@ export function roundStage(round) {
 }
 const seconds = ms => `${ms < 0 ? '-' : '+'}${(Math.abs(ms) / 1000).toFixed(1)}s`;
 /** Human-readable comparisons use engine numbers; exact milliseconds remain in the verdict. */
-export function liveReason(verdict) {
+export function liveReason(verdict, context = {}) {
   const n = verdict.numbers;
   if (verdict.code === 'ROUND_VOID_GAP') return 'This round is void. No calls count.';
   if (['ACCEPTED', 'LATE_SAW_IT'].includes(verdict.code)) {
-    if (n.eventAt == null) return `Call received at ${n.receivedAt} ms. Waiting for the event.`;
+    if (n.eventAt == null) return 'Call received. Waiting for the event.';
     return `Call ${seconds(n.receivedAt - n.eventAt)} ${n.receivedAt < n.cutoff ? '<' : '≥'} cutoff ${seconds(n.cutoff - n.eventAt)} (delay ${(n.dViewer / 1000).toFixed(1)}s − margin ${(n.marginMs / 1000).toFixed(1)}s).`;
   }
-  return `${verdict.nextAction} Received ${n.receivedAt} ms.`;
+  if (verdict.code === 'STALE_SYNC') return Number.isFinite(context.syncAgeMs) ? `Last sync ${Math.floor(context.syncAgeMs / 60000)} min ago — sync again.` : 'Last sync is over 10 min old — sync again.';
+  return ({REPLAYED_MESSAGE: 'This message was already received. Send a new message.', ROUND_NOT_OPEN: 'No round is open. Wait for the next round.', NOT_CALIBRATED: 'No delay measured yet. Reply to the next sync word.', DUPLICATE_CALL: 'Your first counted call already counts. Wait for the next round.'})[verdict.code] ?? verdict.nextAction;
 }
 export function LiveRoundBanner({round, summary}) {
   return h('section', {className: `live-round-banner ${round?.status === 'VOID' ? 'is-void' : ''}`, 'data-stage': roundStage(round)},
@@ -27,13 +28,13 @@ export function LiveRoundBanner({round, summary}) {
       round?.status === 'VOID' && h('span', null, round.voidReason === 'MANUAL_VOID' ? 'Voided by the host · no score' : 'Connection gap · no score'),
       summary && h('span', {role: 'status'}, `Chat summary: ${summary.status}`)));
 }
-export function LiveVerdicts({verdicts = [], compact = false}) {
+export function LiveVerdicts({verdicts = [], compact = false, contexts = {}}) {
   const visible = compact ? verdicts.slice(-2) : verdicts;
   return h('div', {className: `live-verdicts ${compact ? 'overlay-verdicts' : ''}`, 'aria-live': 'polite'},
     !visible.length && h('p', {className: 'empty'}, 'Waiting for chat calls.'),
     ...visible.map((verdict, index) => h('article', {key: `${verdict.messageId}-${index}`, className: `live-verdict-card ${verdict.code === 'ACCEPTED' ? 'is-accepted' : 'is-rejected'}`},
       h('div', {className: 'live-verdict-title'}, h('strong', null, `${verdict.code === 'ACCEPTED' ? '✅' : '❌'} @${verdict.userLogin}`), h('b', null, verdict.code)),
-      h('p', null, liveReason(verdict)),
+      h('p', null, liveReason(verdict, contexts[verdict.messageId])),
       verdict.result && h('span', {className: 'live-result'}, verdict.result),
       !compact && h('details', null, h('summary', null, 'Exact verdict and numbers'), h('pre', null, JSON.stringify(verdict, null, 2))))));
 }

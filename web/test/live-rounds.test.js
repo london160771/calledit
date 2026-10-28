@@ -45,6 +45,25 @@ test('controls disable unsafe actions for waiting, marked, final, disconnected a
 test('provisional and other rejection cards explain state without inventing event/cutoff numbers', () => {
   const pending = {code: 'ACCEPTED', numbers: {receivedAt: 119000, eventAt: null}};
   assert.match(liveReason(pending), /Waiting for the event/);
-  assert.match(liveReason({code: 'NOT_CALIBRATED', numbers: {receivedAt: 1000}, nextAction: 'Reply to the sync word.'}), /1000 ms/);
+  assert.match(liveReason({code: 'NOT_CALIBRATED', numbers: {receivedAt: 1000}, nextAction: 'Reply to the sync word.'}), /Reply to the next sync word/);
   assert.equal(roundStage({status: 'VOID'}), 'VOID');assert.equal(roundStage(null), 'Waiting for a round');
+});
+
+
+test('plain rejection reasons contain no epoch times and stale cards use captured sync age', () => {
+  for (const code of ['ACCEPTED', 'NOT_CALIBRATED', 'STALE_SYNC', 'DUPLICATE_CALL', 'ROUND_NOT_OPEN', 'REPLAYED_MESSAGE', 'ROUND_VOID_GAP']) {
+    const text = liveReason({code, nextAction: 'Try again.', numbers: {receivedAt: 1793191978004, eventAt: null}}, {syncAgeMs: 780000});
+    assert.doesNotMatch(text, /1793191978004|Received \d+ ms/);
+    if (code === 'STALE_SYNC') assert.match(text, /Last sync 13 min ago — sync again/);
+  }
+});
+
+test('a new sync clears the old round permanently, even after expiry or browser reload', async t => {
+  const f = await liveSession(); t.after(() => f.runtime.stop()); await f.calibrate(); await f.advance(110000);
+  const r = f.runtime.openRound(); f.chat('slow', '!land'); await f.advance(120000); f.runtime.markEvent({roundId: r.roundId, outcome: 'land'});
+  await f.advance(165000); await flush();
+  assert.match(render(LiveSyncOverlay, {state: f.runtime.snapshot()}), /ACCEPTED/);
+  f.runtime.startSync(); assert.match(render(LiveSyncOverlay, {state: f.runtime.snapshot()}), /SAY:/);
+  await f.advance(211000); assert.doesNotMatch(render(LiveSyncOverlay, {state: f.runtime.snapshot()}), /ACCEPTED|CORRECT|data-stage="Final"/);
+  f.runtime.openRound(); assert.match(render(LiveSyncOverlay, {state: f.runtime.snapshot()}), /data-stage="Open"/);
 });

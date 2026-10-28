@@ -4,7 +4,7 @@ export const eventSubUrl = 'wss://eventsub.wss.twitch.tv/ws';
 export const keepaliveGraceMs = 1500;
 
 /** All sockets, watchdogs and message handling run in Node, independent of browser tabs. */
-export function createEventSub({engine, subscribe, clock = Date.now, makeSocket = url => new WebSocket(url), setTimer = setTimeout, clearTimer = clearTimeout, onStatus = () => {}, onMessage = () => {}, log = logEvent}) {
+export function createEventSub({engine, subscribe, clock = Date.now, makeSocket = url => new WebSocket(url), setTimer = setTimeout, clearTimer = clearTimeout, onStatus = () => {}, onMessage = () => {}, ignoreMessage = () => false, log = logEvent}) {
   let active, candidate, retry, gapFrom = null, stopped = true;
   const sockets = new Set(), seen = new Set();
   function gap(from) {
@@ -93,6 +93,7 @@ export function createEventSub({engine, subscribe, clock = Date.now, makeSocket 
       }
       const input = {messageId: e.message_id, userId: e.chatter_user_id, userLogin: e.chatter_user_login, text: e.message.text, receivedAt};
       log('chat.received', {...input, channel: e.broadcaster_user_login, broadcasterUserId: e.broadcaster_user_id});
+      if (ignoreMessage(input)) {log('chat.ignored', {user: input.userLogin, messageId: input.messageId, reason: 'OWN_ACCOUNT'}); return;}
       if (seen.has(e.message_id)) {
         log('sync.rejected', {user: input.userLogin, messageId: input.messageId, reason: 'REPLAYED_MESSAGE'}); return;
       }

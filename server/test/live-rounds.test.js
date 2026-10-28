@@ -83,3 +83,40 @@ test('summary failure is logged once, never retried or falsely reported as sent'
   assert.equal(f.runtime.snapshot().summary.status, 'failed');assert.equal(f.logs.filter(row => row.event === 'summary.failed').length, 1);assert.equal(f.logs.some(row => row.event === 'summary.sent'), false);
   f.chat('nobody', '!land');await f.advance(150000);assert.equal(f.summaries().length, 1);
 });
+
+
+test('own broadcaster/bot messages never reach sync or call handling', async t => {
+  const f = await liveSession(); t.after(() => f.runtime.stop());
+  const sync = f.runtime.startSync(); await f.advance(102000);
+  f.chat('owner', sync.word); f.chat('owner', '!land'); f.chat('owner', 'CalledIt round: land. 1 correct, 0 wrong.');
+  assert.equal(f.runtime.engine.getViewer('owner'), undefined);
+  assert.deepEqual(f.runtime.engine.getVerdicts(), []);
+  assert.equal(f.logs.filter(row => row.event === 'chat.ignored' && row.reason === 'OWN_ACCOUNT').length, 3);
+  assert.equal(f.logs.some(row => ['sync.rejected', 'sync.recorded', 'call.received', 'verdict'].includes(row.event)), false);
+  f.chat('viewer', sync.word); assert.equal(f.runtime.snapshot().viewers[0].userLogin, 'viewer');
+});
+
+test('final summary counts direct blocked verdicts and overlay retains the final cards until sync/open', async t => {
+  const f = await liveSession(); t.after(() => f.runtime.stop()); await f.calibrate(); await f.advance(110000);
+  const round = f.runtime.openRound(); await f.advance(120000); f.runtime.markEvent({roundId: round.roundId, outcome: 'land'});
+  await f.advance(123000); f.chat('fast', '!land'); await f.advance(126000); f.chat('slow', '!land');
+  await f.advance(165000); await flush();
+  assert.equal(f.summaries().length, 1);
+  assert.match(f.summaries()[0].body.message, /land\. 1 correct, 0 wrong, 1 blocked \(LATE_SAW_IT\)\./);
+  const cards = f.runtime.snapshot().overlayVerdicts;
+  f.chat('latecomer', '!land'); assert.deepEqual(f.runtime.snapshot().overlayVerdicts, cards);
+  assert.equal(f.runtime.snapshot().verdicts.at(-1).code, 'ROUND_NOT_OPEN');
+  f.runtime.startSync(); assert.equal(f.runtime.snapshot().overlayRoundId, null);
+  await f.advance(211000); assert.deepEqual(f.runtime.snapshot().overlayVerdicts, []);
+  const next = f.runtime.openRound(); assert.equal(f.runtime.snapshot().overlayRoundId, next.roundId); assert.deepEqual(f.runtime.snapshot().overlayVerdicts, []);
+});
+
+test('stale sync age is captured at call time separately from the unchanged engine verdict', async t => {
+  const f = await liveSession(); t.after(() => f.runtime.stop()); await f.calibrate(); await f.advance(888000);
+  f.runtime.openRound(); f.chat('slow', '!land', 'stale-call');
+  let state = f.runtime.snapshot(); assert.equal(state.verdicts[0].code, 'STALE_SYNC');
+  assert.deepEqual(state.verdictContext['stale-call'], {syncAgeMs: 780000});
+  assert.deepEqual(Object.keys(state.verdicts[0]).sort(), ['code', 'messageId', 'nextAction', 'numbers', 'retryable', 'roundId', 'userLogin']);
+  const sync = f.runtime.startSync(); await f.advance(889000); f.chat('slow', sync.word);
+  state = f.runtime.snapshot(); assert.equal(state.verdictContext['stale-call'].syncAgeMs, 780000);
+});

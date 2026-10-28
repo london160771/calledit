@@ -33,7 +33,7 @@ export function LiveSync() {
       {actionError && <p className="control-error" role="alert">{actionError}</p>}
     </section>
     <LiveRoundControls state={state} onAction={action} busy={busy} error={connectionError}/>
-    <div className="columns"><section className="panel"><h2>Live verdicts</h2><LiveVerdicts verdicts={state?.verdicts}/><LiveCallFeed calls={state?.calls}/></section><ViewerDelays viewers={state?.viewers ?? []}/></div>
+    <div className="columns"><section className="panel"><h2>Live verdicts</h2><LiveVerdicts verdicts={state?.verdicts} contexts={state?.verdictContext}/><LiveCallFeed calls={state?.calls}/></section><ViewerDelays viewers={state?.viewers ?? []}/></div>
     <p>OBS: <a href="/overlay?live=1">/overlay?live=1</a> · <a href="/judge">Simulated replay ↗</a></p>
   </main>;
 }

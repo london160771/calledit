@@ -17,6 +17,7 @@ export function createRuntime({auth, clock = Date.now, eventSubOptions = {}, con
   }});
   const rounds = createLiveRounds({engine, config, clock, sendSummary, log, setTimer, clearTimer});
   const client = createEventSub({engine: rounds.eventEngine, clock, log: liveLog, ...eventSubOptions,
+    ignoreMessage: input => input.userId === auth.getIdentity()?.userId,
     subscribe: async sessionId => {
       const {userId, login} = auth.getIdentity();
       const request = {type: 'channel.chat.message', version: '1', condition: {broadcaster_user_id: userId, user_id: userId}, transport: {method: 'websocket', session_id: sessionId}};
@@ -66,7 +67,7 @@ export function createRuntime({auth, clock = Date.now, eventSubOptions = {}, con
       if (status !== 'connected') throw new Error('Connect to Twitch before syncing.');
       const shownAt = clock();
       sync = {syncId: `sync-${shownAt}`, word: ['MANGO', 'PAPAYA', 'PEACH'][Math.floor(shownAt / 1000) % 3], shownAt, syncWindowMs: config.syncWindowMs, maxDelayMs: config.maxDelayMs, expiresAt: shownAt + config.syncWindowMs};
-      engine.startSync(sync); log('sync.started', sync); return {...sync};
+      rounds.clearOverlay(); engine.startSync(sync); log('sync.started', sync); return {...sync};
     },
     snapshot() {
       const now = clock();

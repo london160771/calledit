@@ -6,14 +6,14 @@ import {LiveRoundBanner, LiveVerdicts, LiveCallFeed} from './LiveRoundView.js';
 /** Only the current live server sync is shown; disconnected sessions hide old words. */
 export function LiveSyncOverlay({state, error = ''}) {
   const sync = !error && state?.status === 'connected' && state.syncActive !== false ? state.sync : null;
-  const round = state?.round;
-  const showSync = sync && (!round || (round.status !== 'OPEN' && sync.shownAt > round.openedAt));
+  const round = state && 'overlayRoundId' in state ? (state.overlayRoundId === state.round?.roundId ? state.round : null) : (state?.round && (!state.sync || state.round.openedAt >= state.sync.shownAt) ? state.round : null);
+  const showSync = sync && !round;
   return h('main', {className: `live-overlay ${round && !showSync ? 'live-game-overlay' : ''}`},
     h('p', {className: 'badge'}, 'LIVE (Twitch)'),
     (error || state?.status !== 'connected') && h('p', {className: 'live-overlay-status', role: 'status'}, liveConnectionLabel(state, error)),
     showSync ? h(LiveSyncWord, {sync, remainingMs: state.syncRemainingMs}) : round ? h(React.Fragment, null,
       h(LiveRoundBanner, {round, summary: state.summary}),
-      h(LiveVerdicts, {verdicts: state.verdicts, compact: true}),
+      h(LiveVerdicts, {verdicts: state.overlayVerdicts ?? state.verdicts, compact: true, contexts: state.verdictContext}),
       h(LiveCallFeed, {calls: state.calls})
     ) : !error && state?.status === 'connected' && h('p', {className: 'live-overlay-status', role: 'status'}, state.syncActive === false && state.sync ? 'Sync window ended. Waiting for a new sync.' : 'Waiting for a live sync')
   );
