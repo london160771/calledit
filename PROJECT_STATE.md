@@ -4,15 +4,16 @@
 - **Phase 0** (owner): pending Gate 0 delay test. Codex skipped it as instructed.
 - **Phase 1** (Codex): complete, pushed as `47e017a`.
 - **Phase 2** (Codex): complete, pushed as `c851944`.
-- **Phase 3** (Codex, then owner): owner verified enabled subscription and chat delivery; live timing widened to 45 seconds with countdowns, awaiting the next live sample test.
-- **Phases 4 and 5**: not started. Resume Phase 4 after the owner verifies Phase 3.
+- **Phase 3** (Codex, then owner): PASSED. Owner confirmed real live syncs on ayyoweb3: london1607 11337 ms and becca160771 11208 ms, three samples each, with sync.recorded logs.
+- **Phase 4** (Codex, then owner): Codex live round wiring and automated checks complete; owner money-shot test and recording pending.
+- **Phase 5**: not started. Stop for the Phase 4 owner handoff.
 
 ## Done
 - Docs setup and .gitignore pushed as `1fe9f35`.
 - Phase 1: npm workspaces; pure dependency-free engine; fixed Seed-7 fixture; prefix replay; baseline comparison; Node 22 GitHub Actions workflow.
 - Phase 2: React + Vite and plain CSS; /judge browser replay; simulated /dashboard and transparent /overlay; Attack Lab for all eight reason codes.
 - Phase 3: Express local server; authorization-code OAuth with state cookie; scope/client validation; token refresh; hourly validation; EventSub chat subscription; server-clock arrival timestamps; chat message ID deduplication; close/timeout gap reporting and recovery; reconnect handoff; one summary attempt per finished round with rate spacing.
-- /dashboard?liveSync=1 provides the owner's local Phase 3 calibration check. Live sync words now reach OBS at /overlay?live=1. Live round controls and verdict wiring remain Phase 4.
+- /dashboard?liveSync=1 provides live calibration and Open/LANDED/MISSED/Void controls. /overlay?live=1 follows server rounds, calls, exact engine verdicts and final/VOID states.
 - .env.example and server/LOCAL_TWITCH.md explain the exact required values and manual steps. No credentials were created or committed. Nothing was deployed.
 
 ## Verification
@@ -32,15 +33,15 @@
 - A gap during an open round voids it immediately; late gap reports also void overlapping finalized rounds. Explicit Void uses ROUND_VOID_GAP, the PRD's only void code.
 - Simulated dashboard uses a deterministic clock and local storage to share its feed across tabs. /judge has no runtime server dependency after its static files load.
 - Phase 3 uses one account as broadcaster and bot, derived from the validated user token. Tokens remain in server memory; restart requires sign-in again unless optional .env tokens work.
-- Summary sends use one attempt per round, even after an ambiguous network failure, to avoid duplicate chat messages. They serialize at least 1600 ms apart. Phase 4 will wire them to live round finalization.
+- Summary sends use one attempt per round, even after an ambiguous network failure, to avoid duplicate chat messages. They serialize at least 1600 ms apart and are wired to live finalization and voiding.
 - Local Phase 3 server binds to loopback and checks Host and write Origin. Hosting configuration remains Phase 5.
 
 ## Pending (owner)
-1. Restart the updated Node server with `npm start`, refresh the dashboard and OBS source, and reconnect Twitch as ayyoweb3 if needed.
-2. Keep OBS at `http://localhost:3000/overlay?live=1` (1920x1080). Open `http://localhost:3000/dashboard?liveSync=1`.
-3. Watch the Node terminal for an enabled chat subscription on ayyoweb3, start a fresh sync and have london1607 / becca160771 reply before the live countdown ends (45 seconds by default). Follow server/LOCAL_TWITCH.md to inspect recorded/rejected sample logs and report the results.
-4. Finish Gate 0: record at least a 2-second extra iPhone delay versus the fast tab in evidence/gate0.md.
-5. Resume Phase 4 only after the live calibration is verified. No deployment is authorized.
+1. Rebuild with `npm run build -w web`, restart `npm start`, refresh OBS and reconnect Twitch as ayyoweb3.
+2. Use `http://localhost:3000/overlay?live=1` at 1280x720 in OBS and `http://localhost:3000/dashboard?liveSync=1` for controls.
+3. Finish the pending Gate 0 viewer setup: at least 2 seconds of extra iPhone delay versus the fast tab. Record it in evidence/gate0.md and recalibrate with three syncs.
+4. Follow the Phase 4 money-shot steps in server/LOCAL_TWITCH.md. Record fast LATE_SAW_IT / slow ACCEPTED, automatic Final, one summary, and a separate gap/VOID check.
+5. Report the live result and recording. Phase 5 waits for this manual handoff; no deployment is authorized.
 ## Log
 - 2026-10-24: Docs initialized and pushed; Phases 1 and 2 completed and pushed.
 - 2026-10-24: Phase 3 Codex portion complete, 36 tests passed. Stopping for owner credentials and manual Twitch sync as required by AGENTS.md and PRD §10.
@@ -76,3 +77,15 @@
 - Final `npm test`: **56 passed, 0 failed** (engine 19, server 19, web 18), plus Vite production build. Tests cover a 17500 ms reply recorded by the live engine and ignored by the unchanged default engine, a 35000 ms live sample above the old cap, inclusive 45000 ms boundary, rejection after expiry, independent environment overrides, invalid values, log limits, countdowns and the existing Seed-7 / 10k-round suite.
 - Files: server/src/live-config.js, server/src/index.js, server/src/runtime.js, server/test/live-config.test.js, server/test/twitch.test.js, web/src/LiveSyncWord.js, web/src/LiveSync.jsx, web/src/LiveOverlay.js, web/src/style.css, web/test/live-chat.test.js, web/test/live-overlay.test.js, .env.example, PRD.md, server/LOCAL_TWITCH.md, PROJECT_STATE.md.
 - Decision: countdowns round remaining server milliseconds up to whole seconds. The engine keeps its inclusive sync-window boundary. No live account was reconnected or deployment performed. Stop after commit/push as requested; owner restarts the server and refreshes dashboard/OBS for another live test.
+
+
+## Phase 3 owner pass and Phase 4 Codex handoff — 2026-10-28
+- Owner confirmed real live syncs on ayyoweb3: london1607 11337 ms and becca160771 11208 ms, three samples each, with sync.recorded logs. Recorded in evidence/gate0.md. The required 2-second fast/slow spread is still pending owner setup, not a code failure.
+- Phase 4: wired loopback Open/LANDED/MISSED/Void actions to the live server engine, with server timestamps and the existing 45000 ms live config. Real-shaped EventSub chat calls enter that engine; raw verdict codes/numbers are exposed unchanged. Provisional calls are rechecked after marking.
+- Node timers finalize at eventAt + maxDelayMs without a browser; overdue incoming chat finalizes before judging. EventSub gaps and manual Void produce ROUND_VOID_GAP. Terminal rounds trigger one rate-spaced summary attempt, with sent/failed status and no duplicate retry after an ambiguous failure.
+- Live dashboard has round controls, call feed, verdicts and exact-number details. Transparent live OBS overlay has Open/Event marked/Final/VOID state, final countdown, two large verdict cards and four recent calls. Added all requested round/call/verdict/summary logs.
+- Verification: npm test passed **65 passed, 0 failed** (engine 19, server 24, web 22); npm run build -w web passed. New tests cover real-shaped notifications through local HTTP controls, fast LATE_SAW_IT, slow ACCEPTED, provisional recheck, exact numbers, finalization without polling, gap/manual VOID, invalid/stale/foreign controls, delayed timer handling, summary failure/deduplication and rendered round controls/cards. Existing Seed-7 and 10k-round invariant tests pass; engine files are unchanged.
+- Visual check: after the browser automation tool timed out twice, an isolated fake Twitch session was captured with headless Chrome at 1280x720. Both fast LATE_SAW_IT and slow ACCEPTED cards, numeric reasons, round state/countdown and call feed fit in the frame. No real Twitch messages were sent. Real OBS/phone readability and the live money shot remain owner checks.
+- Files: server/src/app.js, server/src/runtime.js, server/src/live-rounds.js, server/test-support/live-session.js, server/test/live-rounds.test.js, web/src/LiveSync.jsx, web/src/LiveOverlay.js, web/src/LiveRoundView.js, web/src/style.css, web/test/live-rounds.test.js, server/LOCAL_TWITCH.md, evidence/gate0.md, PROJECT_STATE.md.
+- Decisions: default options are land/miss; show only the last two verdict cards on OBS to preserve space, with twenty available on the dashboard. A voided terminal round gets one unscored VOID summary. Summary failures are logged without retry, preserving the existing at-most-one-attempt policy. No changes to engine math or deployment.
+- STOP: Codex portion complete; owner must run and record the Phase 4 money-shot steps in server/LOCAL_TWITCH.md. Phase 5 has not started.

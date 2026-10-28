@@ -1,7 +1,7 @@
 import express from 'express';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-/** Loopback-only Phase 3 sync check. Tokens never cross into the web app. */
+/** Local live controls. OAuth credentials never cross into the web app. */
 export function createApp({auth,runtime,origin='http://localhost:3000',clock=Date.now}) {
   const app=express(),pending=new Map(),expected=new URL(origin);
   app.disable('x-powered-by');
@@ -26,6 +26,12 @@ export function createApp({auth,runtime,origin='http://localhost:3000',clock=Dat
     if(req.headers.origin!==origin||!req.is('application/json'))return res.status(403).json({error:'Open the local dashboard to sync.'});
     try{res.json(runtime.startSync());}catch(error){res.status(409).json({error:error.message});}
   });
+  for (const [path, action] of [['/api/round/open', () => runtime.openRound()], ['/api/round/event', body => runtime.markEvent(body)], ['/api/round/void', body => runtime.voidRound(body)]]) {
+    app.post(path, (req, res) => {
+      if (req.headers.origin !== origin || !req.is('application/json')) return res.status(403).json({error: 'Open the local dashboard to control rounds.'});
+      try {res.json(action(req.body ?? {}));} catch (error) {res.status(409).json({error: error.message});}
+    });
+  }
   const dist=fileURLToPath(new URL('../../web/dist/',import.meta.url));
   app.use(express.static(dist));
   app.get(['/','/judge','/dashboard','/overlay'],(req,res)=>res.sendFile(`${dist}/index.html`));
